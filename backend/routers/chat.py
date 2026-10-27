@@ -13,7 +13,11 @@ from backend.services.rag_pipeline import rag_pipeline
 router = APIRouter()
 
 
-def get_current_user_id() -> str:
+def get_current_user_id(request: Request | None = None) -> str:
+    if request is not None:
+        user_header = request.headers.get('x-user-id')
+        if user_header and user_header.strip():
+            return user_header.strip()
     import os
     user_id = os.getenv('CHAT_USER_ID', 'demo-user')
     if not user_id:
@@ -48,7 +52,7 @@ async def answer_question(request: Request) -> dict[str, Any]:
 
     payload = ChatRequest(question=question.strip(), conversation_id=raw_body.get('conversation_id'))
 
-    user_id = get_current_user_id()
+    user_id = get_current_user_id(request)
     profile = store.get_or_create_profile(user_id)
     conversation_id = payload.conversation_id or str(uuid.uuid4())
 
@@ -64,15 +68,15 @@ async def answer_question(request: Request) -> dict[str, Any]:
 
 
 @router.get('/api/chat/history')
-def get_history() -> dict[str, Any]:
-    user_id = get_current_user_id()
+def get_history(request: Request) -> dict[str, Any]:
+    user_id = get_current_user_id(request)
     conversations = store.get_conversations(user_id)
     return {'conversations': conversations}
 
 
 @router.delete('/api/chat/history/{conversation_id}')
-def delete_history(conversation_id: str) -> dict[str, Any]:
-    user_id = get_current_user_id()
+def delete_history(conversation_id: str, request: Request) -> dict[str, Any]:
+    user_id = get_current_user_id(request)
     deleted = store.delete_conversation(user_id, conversation_id)
     if not deleted:
         raise HTTPException(status_code=404, detail='Conversation not found.')

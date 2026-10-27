@@ -8,3 +8,5 @@ sentence-transformers
 chromadb
 langchain
 python-multipart
+pymongo
+dnspython

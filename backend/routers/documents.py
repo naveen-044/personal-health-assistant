@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 
 from backend.config import settings
 from backend.database.store import store
@@ -12,7 +12,11 @@ from backend.services.rag_pipeline import rag_pipeline
 router = APIRouter()
 
 
-def get_current_user_id() -> str:
+def get_current_user_id(request: Request | None = None) -> str:
+    if request is not None:
+        user_header = request.headers.get('x-user-id')
+        if user_header and user_header.strip():
+            return user_header.strip()
     import os
     user_id = os.getenv('CHAT_USER_ID', 'demo-user')
     if not user_id:
@@ -21,8 +25,8 @@ def get_current_user_id() -> str:
 
 
 @router.post('/api/documents/upload')
-async def upload_document(file: UploadFile = File(...)) -> dict:
-    user_id = get_current_user_id()
+async def upload_document(request: Request, file: UploadFile = File(...)) -> dict:
+    user_id = get_current_user_id(request)
     if not file.filename:
         raise HTTPException(status_code=400, detail='A file is required.')
 
@@ -50,14 +54,14 @@ async def upload_document(file: UploadFile = File(...)) -> dict:
 
 
 @router.get('/api/documents')
-def list_documents() -> dict:
-    user_id = get_current_user_id()
+def list_documents(request: Request) -> dict:
+    user_id = get_current_user_id(request)
     return {'documents': store.list_documents(user_id)}
 
 
 @router.delete('/api/documents/{document_id}')
-def delete_document(document_id: str) -> dict:
-    user_id = get_current_user_id()
+def delete_document(document_id: str, request: Request) -> dict:
+    user_id = get_current_user_id(request)
     removed = store.remove_document(user_id, document_id)
     if not removed:
         raise HTTPException(status_code=404, detail='Document not found for this user.')

@@ -18,6 +18,9 @@ class Settings:
         if origin.strip()
     ]
     MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017')
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
     OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
     MODEL_PROVIDER = os.getenv('MODEL_PROVIDER', 'ollama')
     LLM_MODEL = os.getenv('LLM_MODEL', 'llama3.2')
