@@ -7,3 +7,7 @@ __pycache__/
 *.pyc
 *.pyo
 .DS_Store
+
+data/medical_documents/*_temp_resume.pdf
+
+data/medical_documents/*_sample_public_health_guidelines.pdf
