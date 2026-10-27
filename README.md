@@ -52,6 +52,18 @@ Place trusted public health PDFs or TXT files into `data/medical_documents/` and
 python scripts/ingest_documents.py
 ```
 
+Uploaded files are checked for health-reference content before indexing. Resume/CV files and
+other content that does not look like a health reference are rejected. Indexed chunks store
+their document ID, filename, owner, section, and PDF page number when available. Retrieval
+filters out legacy personal documents and requires the configured cosine-distance relevance
+limit (`RAG_MAX_COSINE_DISTANCE`, default `0.96`).
+
+Use the Library page's delete action to remove an individual uploaded document. It removes
+only that document's indexed chunks, stored file, and metadata record. Re-index approved
+health files with `python scripts/ingest_documents.py`; do not delete the whole `.chroma`
+directory to clean up one stale document. Legacy entries that are no longer listed in the
+Library should be reviewed and removed individually rather than purging the index.
+
 ## Notes
 
 - This is educational and not a substitute for professional healthcare advice.

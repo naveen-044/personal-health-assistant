@@ -74,7 +74,18 @@ class InMemoryStore:
                     match = item
                     break
             if match is None:
-                return self.create_conversation(user_id, conversation_id, question, answer, sources)
+                match = {
+                    'conversation_id': conversation_id,
+                    'messages': [
+                        {'role': 'user', 'content': question, 'created_at': 'just now'},
+                        {'role': 'assistant', 'content': answer, 'created_at': 'just now'}
+                    ],
+                    'title': question[:48] or 'New conversation',
+                    'updated_at': 'just now',
+                    'sources': sources,
+                }
+                thread.append(match)
+                return deepcopy(match)
             match['messages'].append({'role': 'user', 'content': question, 'created_at': 'just now'})
             match['messages'].append({'role': 'assistant', 'content': answer, 'created_at': 'just now'})
             match['updated_at'] = 'just now'
@@ -95,6 +106,13 @@ class InMemoryStore:
         with self._lock:
             user_docs = self.documents.get(user_id, [])
             return deepcopy(user_docs)
+
+    def get_document(self, user_id: str, document_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            for item in self.documents.get(user_id, []):
+                if item['document_id'] == document_id:
+                    return deepcopy(item)
+        return None
 
     def add_document(self, user_id: str, document_id: str, filename: str, status: str = 'indexed') -> dict[str, Any]:
         with self._lock:
@@ -205,6 +223,12 @@ class MongoStore:
     def list_documents(self, user_id: str) -> list[dict[str, Any]]:
         cursor = self.documents.find({'user_id': user_id}, {'_id': False, 'user_id': False})
         return list(cursor)
+
+    def get_document(self, user_id: str, document_id: str) -> dict[str, Any] | None:
+        return self.documents.find_one(
+            {'user_id': user_id, 'document_id': document_id},
+            {'_id': False, 'user_id': False},
+        )
 
     def add_document(self, user_id: str, document_id: str, filename: str, status: str = 'indexed') -> dict[str, Any]:
         item = {'user_id': user_id, 'document_id': document_id, 'filename': filename, 'status': status}

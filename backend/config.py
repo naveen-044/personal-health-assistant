@@ -26,6 +26,7 @@ class Settings:
     LLM_MODEL = os.getenv('LLM_MODEL', 'llama3.2')
     SECRET_KEY = os.getenv('SECRET_KEY', 'change-me-in-production')
     MAX_UPLOAD_SIZE_MB = int(os.getenv('MAX_UPLOAD_SIZE_MB', '10'))
+    RAG_MAX_COSINE_DISTANCE = float(os.getenv('RAG_MAX_COSINE_DISTANCE', '0.96'))
     DATA_DIR = DATA_DIR
     CHROMA_PATH = CHROMA_PATH
 

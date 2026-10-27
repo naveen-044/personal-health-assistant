@@ -38,7 +38,6 @@ async def answer_question(request: Request) -> dict[str, Any]:
             except Exception:
                 raw_body = {}
 
-    print(f'RAW_BODY={raw_body}', flush=True)
     if isinstance(raw_body, str):
         raw_body = {'question': raw_body}
     if not isinstance(raw_body, dict):
@@ -56,7 +55,12 @@ async def answer_question(request: Request) -> dict[str, Any]:
     profile = store.get_or_create_profile(user_id)
     conversation_id = payload.conversation_id or str(uuid.uuid4())
 
-    result = rag_pipeline.process_question(payload.question, user_profile=profile, conversation_context=None)
+    result = rag_pipeline.process_question(
+        payload.question,
+        user_profile=profile,
+        conversation_context=None,
+        user_id=user_id,
+    )
     response = {
         'conversation_id': conversation_id,
         'answer': result['answer'],

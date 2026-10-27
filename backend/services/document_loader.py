@@ -23,10 +23,14 @@ def extract_text(path: Path) -> str:
     if suffix == '.txt':
         return path.read_text(encoding='utf-8', errors='ignore')
     if suffix == '.pdf':
+        return '\n'.join(extract_pages(path))
+    raise ValueError(f'Unsupported file type for {path.name}')
+
+
+def extract_pages(path: Path) -> list[str]:
+    if path.suffix.lower() == '.txt':
+        return [path.read_text(encoding='utf-8', errors='ignore')]
+    if path.suffix.lower() == '.pdf':
         reader = PdfReader(str(path))
-        pages = []
-        for page in reader.pages:
-            text = page.extract_text() or ''
-            pages.append(text)
-        return '\n'.join(pages)
+        return [page.extract_text() or '' for page in reader.pages]
     raise ValueError(f'Unsupported file type for {path.name}')

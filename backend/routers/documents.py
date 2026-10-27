@@ -7,6 +7,7 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
 
 from backend.config import settings
 from backend.database.store import store
+from backend.services.document_loader import sanitize_filename
 from backend.services.rag_pipeline import rag_pipeline
 
 router = APIRouter()
@@ -38,14 +39,19 @@ async def upload_document(request: Request, file: UploadFile = File(...)) -> dic
     if len(file_bytes) > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
         raise HTTPException(status_code=413, detail='File exceeds the allowed size.')
 
-    safe_name = ''.join(ch for ch in Path(file.filename).name if ch.isalnum() or ch in {'-', '_', '.', ' '})
+    safe_name = sanitize_filename(file.filename)
     document_id = str(uuid.uuid4())
     unique_name = f'{document_id}_{safe_name}'
     storage_path = settings.DATA_DIR / unique_name
     storage_path.write_bytes(file_bytes)
 
     try:
-        rag_pipeline.index_document(storage_path)
+        rag_pipeline.index_document(
+            storage_path,
+            document_id=document_id,
+            filename=safe_name,
+            owner_id=user_id,
+        )
         store.add_document(user_id, document_id, safe_name, 'indexed')
         return {'document_id': document_id, 'filename': safe_name, 'status': 'indexed', 'message': 'Document uploaded and indexed successfully.'}
     except Exception as exc:
@@ -62,7 +68,16 @@ def list_documents(request: Request) -> dict:
 @router.delete('/api/documents/{document_id}')
 def delete_document(document_id: str, request: Request) -> dict:
     user_id = get_current_user_id(request)
-    removed = store.remove_document(user_id, document_id)
-    if not removed:
+    document = store.get_document(user_id, document_id)
+    if document is None:
         raise HTTPException(status_code=404, detail='Document not found for this user.')
+
+    storage_filename = f'{document_id}_{sanitize_filename(document["filename"])}'
+    try:
+        rag_pipeline.delete_document(document_id, storage_filename=storage_filename)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail='Unable to remove the document from the medical index.') from exc
+
+    if not store.remove_document(user_id, document_id):
+        raise HTTPException(status_code=500, detail='The medical index was updated, but the document record could not be removed.')
     return {'status': 'deleted', 'document_id': document_id}
