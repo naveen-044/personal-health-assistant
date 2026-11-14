@@ -1,0 +1,38 @@
+Medical dataset statistics
+Documents available: 34
+Dataset size: 0.0465 MB (48738 bytes)
+Dataset chunks indexed in ChromaDB: 177
+Total collection chunks (includes non-dataset documents): 177
+Embedding model: sentence-transformers/all-MiniLM-L6-v2
+Embedding dimensions: 384
+Documents indexed successfully: 34
+Documents failed or not indexed: 0
+
+Category-wise document counts:
+- Allergy and medication awareness: 1
+- Child health: 1
+- Chronic conditions: 4
+- Common illnesses: 1
+- Common symptoms: 1
+- Digestive health: 4
+- Disease prevention: 2
+- Endocrine health: 1
+- First aid: 1
+- First aid and seasonal health: 1
+- General health: 1
+- General health and nutrition: 1
+- Healthy lifestyle: 1
+- Heart and emergency awareness: 1
+- Infection prevention: 1
+- Medication awareness: 3
+- Medication awareness, first aid, and women's health: 1
+- Mental health: 1
+- Nutrition: 1
+- Older adult health: 1
+- Respiratory health: 1
+- Respiratory health and disease prevention: 1
+- Sleep and wellbeing: 1
+- Symptoms: 2
+
+Failed documents:
+- None

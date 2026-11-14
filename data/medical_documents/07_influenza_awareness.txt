@@ -1,0 +1,22 @@
+# Influenza (Flu) Awareness
+Category: Common illnesses
+Reviewed: 2026-11-09
+
+## Symptoms and spread
+
+Influenza is a contagious respiratory illness caused by influenza viruses. Symptoms can include fever or chills, cough, sore throat, runny or blocked nose, muscle aches, headache, and tiredness. Symptoms overlap with other illnesses, so they cannot identify the cause by themselves.
+
+## Prevention and general care
+
+Follow current local vaccination guidance and public-health advice. Hand hygiene, covering coughs, cleaner air, and staying home when ill where practical can reduce spread. People at higher risk of complications should contact a healthcare professional early if flu symptoms develop. Ask a clinician or pharmacist before using medicines, especially for children or people with chronic conditions.
+
+## When to seek help
+
+Difficulty breathing, persistent chest pain, confusion, severe dehydration, or rapidly worsening symptoms require urgent assessment. Use local emergency services for severe symptoms.
+
+## Sources
+
+- CDC, About Influenza: https://www.cdc.gov/flu/about/index.html
+- MedlinePlus, Flu: https://medlineplus.gov/flu.html
+
+General education only; this document cannot distinguish flu from other infections.

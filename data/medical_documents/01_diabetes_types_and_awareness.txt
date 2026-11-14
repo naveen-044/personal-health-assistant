@@ -1,0 +1,26 @@
+# Type 1 and Type 2 Diabetes Awareness
+Category: Chronic conditions
+Reviewed: 2026-11-09
+
+## What diabetes means
+
+Diabetes is a group of conditions that affect how the body regulates blood glucose. Type 1 and type 2 diabetes are different conditions. Type 1 involves the body's immune system damaging insulin-producing cells. Type 2 involves problems with insulin production or how the body uses insulin. This general description cannot identify which type a person has; testing and clinical assessment are needed.
+
+## Symptoms and screening
+
+Possible symptoms include increased thirst or urination, tiredness, blurred vision, or unexplained weight changes, but some people with type 2 diabetes have few noticeable symptoms. Symptoms alone cannot confirm diabetes. A healthcare professional can decide whether blood tests or screening are appropriate.
+
+## Prevention and general care
+
+Type 1 diabetes is not prevented by lifestyle choices. For type 2 diabetes, healthy eating, regular activity, and support from a healthcare team may help reduce risk. People already diagnosed should follow their individual care plan and should not change insulin or other medicines based on chatbot advice.
+
+## When to seek help
+
+Seek professional advice for possible symptoms, concerns about blood glucose, or questions about screening. Severe confusion, fainting, difficulty breathing, or rapidly worsening illness needs urgent medical assessment.
+
+## Sources
+
+- CDC, About Diabetes: https://www.cdc.gov/diabetes/about/index.html
+- National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK), Diabetes Overview: https://www.niddk.nih.gov/health-information/diabetes/overview
+
+General education only; this document does not diagnose or provide a treatment plan.

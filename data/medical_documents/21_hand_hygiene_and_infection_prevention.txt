@@ -1,0 +1,22 @@
+# Hand Hygiene and Infection Prevention
+Category: Disease prevention
+Reviewed: 2026-11-09
+
+## Hand hygiene
+
+Handwashing with soap and clean running water helps remove germs. Wet hands, lather all hand surfaces, scrub, rinse, and dry with a clean method. If soap and water are not available, a suitable alcohol-based hand sanitizer can be used when hands are not visibly dirty; follow its label and keep it away from children.
+
+## Other prevention steps
+
+Cover coughs and sneezes, avoid close contact when ill where practical, and follow current vaccination and local public-health recommendations. Cleaning and ventilation can also help reduce the spread of some respiratory infections.
+
+## When to seek help
+
+Good hygiene does not prevent every infection. Seek healthcare advice for severe, persistent, or worsening symptoms, and urgent help for severe breathing problems, confusion, fainting, or other emergency signs.
+
+## Sources
+
+- CDC, About Handwashing: https://www.cdc.gov/clean-hands/about/index.html
+- CDC, Respiratory Virus Prevention: https://www.cdc.gov/respiratory-viruses/prevention/index.html
+
+General prevention guidance only; follow local health authority advice during outbreaks.

@@ -1,0 +1,22 @@
+# Antibiotic Awareness
+Category: Medication awareness
+Reviewed: 2026-11-09
+
+## What antibiotics do
+
+Antibiotics treat certain bacterial infections; they do not treat viruses such as the common cold or flu. A healthcare professional decides whether an antibiotic is appropriate. The right medicine depends on the infection and the person.
+
+## Safe use
+
+Use antibiotics only when prescribed for you and follow the prescriber's and pharmacy label instructions. Do not share, save for later, or use leftover antibiotics. Ask the pharmacist or prescriber what to do if a dose is missed or side effects occur. Do not stop or change a course without professional advice.
+
+## Prevention and when to seek help
+
+Vaccination when recommended, hand hygiene, and staying home when ill can help prevent some infections. Seek urgent help for breathing difficulty, facial or throat swelling, collapse, or other severe reaction after a medicine. Ask a clinician if symptoms worsen or do not improve as expected.
+
+## Sources
+
+- CDC, About Antibiotic Use: https://www.cdc.gov/antibiotic-use/about/index.html
+- MedlinePlus, Antibiotics: https://medlineplus.gov/antibiotics.html
+
+General education only; this document does not recommend an antibiotic.

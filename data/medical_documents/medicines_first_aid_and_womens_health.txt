@@ -1,0 +1,24 @@
+# Medication Safety, First Aid, and Women's Health
+Category: Medication awareness, first aid, and women's health
+Reviewed: 2026-11-09
+
+## General medication safety
+
+Medicines can help when used for the right reason, but may also cause side effects, allergies, or interactions. Read the current package leaflet and follow the instructions from the prescribing clinician or pharmacist. Check before combining prescription medicines, over-the-counter products, or supplements. Do not share medicines, exceed label directions, or start, stop, or change a prescribed medicine based on chatbot advice. Ask a pharmacist or clinician about a medicine's purpose, precautions, likely side effects, and what to do if a dose is missed. For a suspected serious reaction or overdose, contact local emergency services or a poison information service immediately.
+
+## Basic first-aid awareness
+
+For a life-threatening emergency, contact local emergency services immediately and follow the dispatcher's instructions. Do not delay urgent care to search online. Severe breathing difficulty, unconsciousness, heavy bleeding, suspected stroke or heart attack, seizure that does not stop, or a severe allergic reaction needs urgent professional help. First-aid actions depend on the situation and training; do not move someone after a serious injury unless they face immediate danger.
+
+## Women's health
+
+Menstrual patterns and symptoms vary. New, severe, persistent, or worrying changes should be discussed with a healthcare professional. Pregnancy-related questions, bleeding, pain, contraception, or possible infection need advice suited to the person's circumstances. Seek urgent care for severe pain, heavy bleeding with weakness or fainting, or any rapidly worsening symptoms. This document does not provide pregnancy diagnosis or personalized treatment.
+
+## Sources
+
+- US National Library of Medicine, MedlinePlus, Medicines: https://medlineplus.gov/medicines.html
+- US National Library of Medicine, MedlinePlus, First Aid: https://medlineplus.gov/firstaid.html
+- US National Library of Medicine, MedlinePlus, Women's Health: https://medlineplus.gov/womenshealth.html
+- US National Library of Medicine, MedlinePlus, Menstruation: https://medlineplus.gov/menstruation.html
+
+This short reference is general education and is not a substitute for emergency services or professional advice. Pregnancy-specific guidance needs review against local clinical sources before use.

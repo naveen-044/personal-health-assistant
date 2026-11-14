@@ -1,0 +1,34 @@
+# General Health, Symptoms, and Self-Care
+Category: General health
+Reviewed: 2026-11-09
+
+This short reference supports general health education only. Symptoms can have many causes, and this document cannot diagnose an illness or replace advice from a qualified health professional.
+
+## Fever
+
+Fever is a sign that the body may be responding to an illness; it does not identify the cause by itself. Consider the person's age, other symptoms, health conditions, and how long the fever has lasted. Rest and fluids may help with comfort when appropriate. For medicine, follow the product leaflet and ask a pharmacist or clinician when unsure; do not use this chatbot to choose a medicine or dose.
+
+Seek prompt medical advice for a fever that is severe, persistent, getting worse, or accompanied by concerning symptoms. Babies, older adults, pregnant people, and people with significant health conditions may need tailored advice sooner. Difficulty breathing, confusion, fainting, severe pain, or inability to stay awake may require emergency care.
+
+## Cold, flu, cough, and sore throat
+
+Colds and other respiratory infections can cause a runny or blocked nose, sneezing, sore throat, and cough. Flu can come on more suddenly and may cause fever, aches, and marked tiredness. Symptoms overlap, so they cannot reliably identify the specific infection.
+
+Hand hygiene, cleaner indoor air, staying up to date with recommended immunizations, and avoiding close contact with others while ill can help reduce the spread of respiratory infections. People at higher risk of severe illness should contact a healthcare professional early when symptoms begin. Seek urgent help for severe breathing difficulty, blue or grey lips, confusion, or rapidly worsening symptoms.
+
+## Headache and stomach discomfort
+
+Headache and stomach discomfort have many possible causes. Rest, fluids, and avoiding known triggers may help some people, but persistent or severe symptoms need professional assessment. Seek urgent care for a sudden severe headache, new weakness or confusion, severe or worsening abdominal pain, blood in vomit or stool, repeated vomiting with inability to keep fluids down, or signs of severe dehydration.
+
+## Hydration, sleep, and daily wellbeing
+
+Fluid needs vary with age, climate, activity, pregnancy, and health conditions. Drink regularly and follow advice from a clinician if you have a condition that affects fluid intake. Adults generally benefit from regular sleep, physical activity suited to their abilities, varied nutritious foods, and avoiding tobacco. People with ongoing symptoms or questions about what is appropriate for them should consult a healthcare professional.
+
+## Sources
+
+- US Centers for Disease Control and Prevention (CDC), Preventing Respiratory Illnesses: https://www.cdc.gov/respiratory-viruses/prevention/index.html
+- US National Library of Medicine, MedlinePlus, Common Cold: https://medlineplus.gov/commoncold.html
+- US National Library of Medicine, MedlinePlus, Headache: https://medlineplus.gov/headache.html
+- CDC, Physical Activity Guidelines: https://www.cdc.gov/physical-activity-basics/guidelines/index.html
+
+This is a brief educational reference, not a comprehensive clinical guideline. Nutrition guidance in this short document should be reviewed against current local public-health recommendations; a relevant nutrition source could not be verified during this review.

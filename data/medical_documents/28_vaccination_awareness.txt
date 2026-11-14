@@ -1,0 +1,22 @@
+# Vaccination Awareness
+Category: Disease prevention
+Reviewed: 2026-11-09
+
+## What vaccines do
+
+Vaccines help the immune system recognize and defend against certain germs. Recommended vaccines vary with age, health conditions, pregnancy, travel, location, and previous vaccination history. A general chatbot cannot determine which vaccines an individual needs or whether a vaccine is suitable for them.
+
+## General precautions
+
+Use current schedules from local public-health authorities and discuss personal questions with a healthcare professional or pharmacist. Keep vaccination records where possible and ask what to do if a dose was missed. Tell the clinician about serious allergies, prior reactions, pregnancy, or health conditions before vaccination.
+
+## When to seek help
+
+Ask a healthcare professional about expected reactions and when to seek care. Difficulty breathing, swelling of the face or throat, collapse, or another severe reaction after vaccination requires emergency help.
+
+## Sources
+
+- CDC, Vaccines and Immunizations: https://www.cdc.gov/vaccines/index.html
+- MedlinePlus, Vaccines: https://medlineplus.gov/vaccines.html
+
+General education only; follow current local vaccine recommendations and individual clinical advice.

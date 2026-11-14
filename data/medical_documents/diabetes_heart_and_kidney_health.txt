@@ -1,0 +1,26 @@
+# Diabetes, Heart, Blood Pressure, and Kidney Health
+Category: Chronic conditions
+Reviewed: 2026-11-09
+
+## Diabetes awareness
+
+Diabetes is a long-term condition affecting how the body manages blood glucose. Different types have different causes and care needs. Some people with type 2 diabetes or prediabetes may not notice symptoms, so screening should be discussed with a healthcare professional when risk factors or concerns are present. Healthy eating, regular physical activity, and support from a care team can help lower the risk of type 2 diabetes or support its management. Never change diabetes medicines or insulin based on chatbot advice.
+
+## High blood pressure and heart health
+
+High blood pressure often has no noticeable symptoms; measurement is needed to identify it. A clinician may use repeated readings to assess it. High blood pressure can affect the heart, brain, and kidneys over time. Not smoking, eating a balanced diet, limiting excess salt, appropriate physical activity, and taking prescribed medicines as directed can support cardiovascular health. Personal targets and treatment plans must come from a healthcare professional.
+
+Chest discomfort or pressure, shortness of breath, fainting, or sudden weakness can be signs of a serious problem. Seek emergency help for possible heart attack or stroke symptoms rather than waiting for chatbot advice.
+
+## Kidney health
+
+Kidneys remove waste and extra water from the blood. Diabetes and high blood pressure increase the risk of kidney disease, which may not cause obvious symptoms early. A health professional can assess risk and advise whether blood or urine tests are appropriate. Do not start supplements, pain medicines, or major fluid changes to protect the kidneys without professional advice, especially if kidney disease is possible.
+
+## Sources
+
+- CDC, About Diabetes: https://www.cdc.gov/diabetes/about/index.html
+- CDC, About High Blood Pressure: https://www.cdc.gov/high-blood-pressure/about/index.html
+- CDC, About Heart Disease: https://www.cdc.gov/heart-disease/about/index.html
+- US National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK), Kidney Disease: https://www.niddk.nih.gov/health-information/kidney-disease
+
+This reference is for awareness and is not an individual diagnosis or treatment plan.

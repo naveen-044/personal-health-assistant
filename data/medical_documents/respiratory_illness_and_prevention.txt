@@ -1,0 +1,23 @@
+# Respiratory Illness and Infection Prevention
+Category: Respiratory health and disease prevention
+Reviewed: 2026-11-09
+
+## Common respiratory illnesses
+
+Colds, influenza, COVID-19, and other respiratory infections can share symptoms such as cough, sore throat, congestion, fever, or tiredness. Symptoms alone may not show which illness a person has. This library cannot diagnose the cause. People at higher risk of severe illness should contact a healthcare professional promptly when symptoms start, because time-sensitive testing or treatment may be relevant.
+
+## Lowering the spread of infection
+
+Handwashing, cleaning frequently touched surfaces, improving indoor air where possible, and staying away from others when ill can reduce the spread of respiratory viruses. Keep recommended immunizations current in consultation with a healthcare professional. Masks, testing, and distance from others may offer additional protection in some situations, such as after exposure, during illness, or around people at higher risk.
+
+## When to seek care
+
+Seek medical advice if symptoms are severe, persistent, getting worse, or if the person has health conditions that increase the risk of complications. Severe difficulty breathing, bluish or grey lips, confusion, collapse, or inability to wake normally requires emergency care.
+
+## Sources
+
+- CDC, Preventing Respiratory Illnesses: https://www.cdc.gov/respiratory-viruses/prevention/index.html
+- US National Library of Medicine, MedlinePlus, Common Cold: https://medlineplus.gov/commoncold.html
+- CDC, About Influenza (Flu): https://www.cdc.gov/flu/about/index.html
+
+This short guide does not replace local public-health advice or a clinician's assessment.
