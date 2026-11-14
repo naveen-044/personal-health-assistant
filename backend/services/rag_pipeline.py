@@ -310,6 +310,71 @@ class RAGPipeline:
             return conditions[0]
         return {'$or': conditions}
 
+    def _search_files_fallback(self, question: str, top_k: int = TOP_K) -> list[dict]:
+        named_condition = _NAMED_CONDITION.search(question)
+        stop_words = {
+            'the', 'and', 'what', 'are', 'is', 'for', 'with', 'from', 'about',
+            'how', 'can', 'you', 'tell', 'show', 'give', 'of', 'in', 'on', 'to', 'a', 'an'
+        }
+        query_tokens = {
+            token.lower() for token in re.findall(r'\w+', question)
+            if len(token) > 2 and token.lower() not in stop_words
+        }
+        if not query_tokens:
+            return []
+
+        q_lower = question.lower()
+        if any(marker in q_lower for marker in _PERSONAL_DOCUMENT_MARKERS):
+            return []
+
+        scored_sections = []
+        target_dir = self.data_dir if self.data_dir.exists() else settings.DATA_DIR
+        if target_dir.exists():
+            for file_path in target_dir.glob('*.txt'):
+                try:
+                    text = file_path.read_text(encoding='utf-8-sig', errors='replace')
+                    sections = re.split(r'\n(?=#{1,3}\s+)', text)
+                    for sec in sections:
+                        sec_clean = sec.strip()
+                        if not sec_clean or len(sec_clean) < 30:
+                            continue
+                        sec_lower = sec_clean.lower()
+                        if named_condition:
+                            condition_name = named_condition.group(1).lower()
+                            if not re.search(rf'\b{re.escape(condition_name)}\b', sec_lower):
+                                continue
+
+                        sec_tokens = {
+                            token for token in re.findall(r'\w+', sec_lower)
+                            if len(token) > 2 and token not in stop_words
+                        }
+                        matches = query_tokens.intersection(sec_tokens)
+                        if matches:
+                            first_line = sec_clean.split('\n', 1)[0].lstrip('#').strip()
+                            first_line_tokens = {
+                                token for token in re.findall(r'\w+', first_line.lower())
+                                if len(token) > 2 and token not in stop_words
+                            }
+                            title_matches = query_tokens.intersection(first_line_tokens)
+                            score = len(matches) + (len(title_matches) * 3)
+                            scored_sections.append({
+                                'source': file_path.name,
+                                'filename': file_path.name,
+                                'section': first_line or 'Health guidance',
+                                'category': 'General health',
+                                'reviewed': None,
+                                'references': [],
+                                'page_number': None,
+                                'snippet': sec_clean,
+                                'distance': 0.1,
+                                'score': float(score),
+                            })
+                except Exception:
+                    continue
+
+        scored_sections.sort(key=lambda s: s['score'], reverse=True)
+        return scored_sections[:top_k]
+
     def search(
         self,
         question: str,
@@ -324,7 +389,10 @@ class RAGPipeline:
         except Exception as exc:
             logger.exception('Unable to prepare the health-document retrieval filter.')
             raise RuntimeError('Unable to prepare the medical knowledge index for retrieval.') from exc
+
         if where is None or collection_count == 0:
+            if collection_count == 0:
+                return self._search_files_fallback(question, top_k=top_k)
             return []
 
         try:
