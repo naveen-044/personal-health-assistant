@@ -97,6 +97,27 @@ def _write_dataset_statistics(failed_documents: dict[str, str]) -> Path:
     return report_path
 
 
+def ingest_default_documents() -> int:
+    documents_dir = settings.DATA_DIR
+    documents_dir.mkdir(parents=True, exist_ok=True)
+    files = sorted(documents_dir.iterdir())
+    indexed = 0
+    for path in files:
+        if not path.is_file() or not is_supported_file(path) or _is_uploaded_storage_file(path):
+            continue
+        try:
+            if not _is_currently_indexed(path):
+                result = rag_pipeline.index_document(path)
+                indexed += result.get('chunks', 0)
+        except Exception as exc:
+            print(f"Auto-ingest skipped {path.name}: {exc}")
+    try:
+        _write_dataset_statistics({})
+    except Exception:
+        pass
+    return indexed
+
+
 def main() -> None:
     documents_dir = settings.DATA_DIR
     documents_dir.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,6 @@
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
@@ -10,10 +12,25 @@ from backend.routers.health import router as health_router
 from backend.routers.profile import router as profile_router
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from backend.services.rag_pipeline import rag_pipeline
+    try:
+        if rag_pipeline.collection.count() == 0:
+            print("[Startup] ChromaDB collection is empty. Auto-ingesting medical documents...")
+            from scripts.ingest_documents import ingest_default_documents
+            count = ingest_default_documents()
+            print(f"[Startup] Ingestion complete. Added {count} chunks. Total: {rag_pipeline.collection.count()}")
+    except Exception as exc:
+        print(f"[Startup] Auto-ingestion note: {exc}")
+    yield
+
+
 app = FastAPI(
     title="Personal Health Assistant",
     version="1.0.0",
-    description="Educational health assistant using RAG."
+    description="Educational health assistant using RAG.",
+    lifespan=lifespan,
 )
 
 
@@ -65,6 +82,9 @@ app.include_router(health_router)
 app.include_router(chat_router)
 app.include_router(documents_router)
 app.include_router(profile_router)
+
+
+
 
 
 # Debug Registered Routes
