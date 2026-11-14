@@ -1,6 +1,6 @@
 Medical dataset statistics
 Documents available: 34
-Dataset size: 0.0465 MB (48738 bytes)
+Dataset size: 0.0457 MB (47972 bytes)
 Dataset chunks indexed in ChromaDB: 177
 Total collection chunks (includes non-dataset documents): 177
 Embedding model: sentence-transformers/all-MiniLM-L6-v2

@@ -475,17 +475,21 @@ class RAGPipeline:
                 'educational information, not a diagnosis or a substitute for professional medical advice.'
             )
 
-        source_summaries = '\n\n'.join(
-            f"**{item.get('source', 'Medical source')} — {item.get('section', 'Reference')}**\n"
-            f"{item.get('snippet', '').strip()}"
-            for item in evidence
-            if item.get('snippet')
-        )
+        summaries = []
+        for item in evidence:
+            snippet = item.get('snippet', '').strip()
+            section = item.get('section', 'Medical reference')
+            if not snippet:
+                continue
+            if snippet.startswith('#'):
+                summaries.append(snippet)
+            else:
+                summaries.append(f"### {section}\n{snippet}")
+        source_summaries = '\n\n'.join(summaries)
         return (
-            f'Here is the relevant general information I found for your question about '
-            f'**{question}**:\n\n{source_summaries}\n\n'
-            'For individual symptoms or medication choices, consult a healthcare professional. '
-            'This is educational information, not a diagnosis or a substitute for medical advice.'
+            f"Here is relevant medical guidance from the library regarding **{question}**:\n\n"
+            f"{source_summaries}\n\n"
+            "This information is for general educational guidance only and is not a medical diagnosis or substitute for professional clinical care."
         )
 
     def process_question(
@@ -509,7 +513,10 @@ class RAGPipeline:
                 f"{item['snippet']}"
                 for item in evidence
             )
-            answer = self._call_llm(q_strip, context)
+            try:
+                answer = self._call_llm(q_strip, context)
+            except LLMProviderError:
+                answer = self._synthesize_response(q_strip, evidence, user_profile)
             if 'not a diagnosis' not in answer.lower() and 'not medical advice' not in answer.lower():
                 answer = f'{answer}\n\nThis is general education, not a diagnosis or a substitute for professional medical advice.'
         else:
