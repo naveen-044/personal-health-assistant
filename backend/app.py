@@ -105,3 +105,32 @@ def debug_routes(request: Request):
         "total_routes": len(routes),
         "routes": routes
     }
+
+
+# Debug RAG Status
+@app.get("/debug/rag")
+def debug_rag():
+    from backend.services.rag_pipeline import rag_pipeline
+    from scripts.ingest_documents import ingest_default_documents
+    doc_files = [p.name for p in settings.DATA_DIR.glob('*') if p.is_file()]
+    count_before = rag_pipeline.collection.count()
+    ingest_result = None
+    if count_before == 0 and doc_files:
+        try:
+            ingest_result = ingest_default_documents()
+        except Exception as exc:
+            ingest_result = f"Error: {exc}"
+    count_after = rag_pipeline.collection.count()
+    test_search = rag_pipeline.search("fever", top_k=2)
+    return {
+        "status": "ok",
+        "chroma_path": str(settings.CHROMA_PATH),
+        "data_dir": str(settings.DATA_DIR),
+        "data_dir_file_count": len(doc_files),
+        "collection_count_before": count_before,
+        "auto_ingest_trigger": ingest_result,
+        "collection_count_after": count_after,
+        "has_groq_key": bool(settings.GROQ_API_KEY),
+        "groq_key_prefix": settings.GROQ_API_KEY[:7] if settings.GROQ_API_KEY else "",
+        "test_search_matches": len(test_search),
+    }
