@@ -91,9 +91,9 @@ app.include_router(profile_router)
 @app.get("/api/version")
 def version():
     return {
-        "version": "1.0.1",
-        "commit": "deploy-fix-chroma-prebuilt",
-        "timestamp": "2026-11-14T17:10:00"
+        "version": "1.0.2",
+        "commit": "render-lightweight-fast-search",
+        "timestamp": "2026-11-14T17:25:00"
     }
 
 

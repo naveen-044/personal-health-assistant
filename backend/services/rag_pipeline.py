@@ -395,6 +395,12 @@ class RAGPipeline:
                 return self._search_files_fallback(question, top_k=top_k)
             return []
 
+        import os
+        if os.getenv('RENDER') or os.getenv('USE_LIGHTWEIGHT_SEARCH', '').lower() in {'1', 'true', 'yes'}:
+            fallback = self._search_files_fallback(question, top_k=top_k)
+            if fallback:
+                return fallback
+
         try:
             query_embeddings = self.embedding_service(question)
             results = self.collection.query(
