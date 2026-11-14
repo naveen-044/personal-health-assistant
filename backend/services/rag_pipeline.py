@@ -405,6 +405,9 @@ class RAGPipeline:
             )
         except Exception as exc:
             logger.exception('Health-document vector retrieval failed.')
+            fallback = self._search_files_fallback(question, top_k=top_k)
+            if fallback:
+                return fallback
             raise RuntimeError('Medical knowledge retrieval failed.') from exc
 
         query_tokens = {token.lower() for token in re.findall(r'\w+', question) if len(token) > 2}

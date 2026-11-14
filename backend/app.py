@@ -87,6 +87,16 @@ app.include_router(profile_router)
 
 
 
+@app.get("/version")
+@app.get("/api/version")
+def version():
+    return {
+        "version": "1.0.1",
+        "commit": "deploy-fix-chroma-prebuilt",
+        "timestamp": "2026-11-14T17:10:00"
+    }
+
+
 # Debug Registered Routes
 @app.get("/debug/routes")
 def debug_routes(request: Request):

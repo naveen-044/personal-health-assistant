@@ -13,7 +13,6 @@ frontend/node_modules/
 frontend/dist/
 dist/
 .vercel/
-.chroma/
 __pycache__/
 *.pyc
 *.pyo
