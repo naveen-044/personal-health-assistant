@@ -4,8 +4,9 @@ import json
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 
+from backend.auth.dependencies import get_current_user
 from backend.database.store import store
 from backend.schemas.chat import ChatRequest, ChatResponse
 from backend.services.rag_pipeline import LLMProviderError, rag_pipeline
@@ -13,21 +14,9 @@ from backend.services.rag_pipeline import LLMProviderError, rag_pipeline
 router = APIRouter()
 
 
-def get_current_user_id(request: Request | None = None) -> str:
-    if request is not None:
-        user_header = request.headers.get('x-user-id')
-        if user_header and user_header.strip():
-            return user_header.strip()
-    import os
-    user_id = os.getenv('CHAT_USER_ID', 'demo-user')
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authentication required.')
-    return user_id
-
-
 @router.post('/api/chat', response_model=ChatResponse)
 @router.post('/chat', response_model=ChatResponse)
-async def answer_question(request: Request) -> dict[str, Any]:
+async def answer_question(request: Request, user: dict = Depends(get_current_user)) -> dict[str, Any]:
     body = await request.body()
     raw_body: Any = {}
     if body:
@@ -52,7 +41,7 @@ async def answer_question(request: Request) -> dict[str, Any]:
 
     payload = ChatRequest(question=question.strip(), conversation_id=raw_body.get('conversation_id'))
 
-    user_id = get_current_user_id(request)
+    user_id = user['user_id']
     profile = store.get_or_create_profile(user_id)
     conversation_id = payload.conversation_id or str(uuid.uuid4())
 
@@ -77,23 +66,23 @@ async def answer_question(request: Request) -> dict[str, Any]:
 
 @router.get('/api/chat/history')
 @router.get('/chat/history')
-def get_history(request: Request) -> dict[str, Any]:
-    user_id = get_current_user_id(request)
+def get_history(user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    user_id = user['user_id']
     conversations = store.get_conversations(user_id)
     return {'conversations': conversations}
 
 
 @router.delete('/api/chat/history')
 @router.delete('/chat/history')
-def clear_all_history(request: Request) -> dict[str, Any]:
-    user_id = get_current_user_id(request)
+def clear_all_history(user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    user_id = user['user_id']
     cleared = store.clear_conversations(user_id)
     return {'status': 'deleted', 'message': 'Chat history cleared.', 'cleared': cleared}
 
 
 @router.delete('/api/chat/history/{conversation_id}')
 @router.delete('/chat/history/{conversation_id}')
-def delete_history(conversation_id: str, request: Request) -> dict[str, Any]:
-    user_id = get_current_user_id(request)
+def delete_history(conversation_id: str, user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    user_id = user['user_id']
     deleted = store.delete_conversation(user_id, conversation_id)
     return {'status': 'deleted', 'conversation_id': conversation_id, 'existed': deleted}

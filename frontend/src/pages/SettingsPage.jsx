@@ -1,7 +1,9 @@
 import { BellRing, ShieldCheck, ServerCog } from 'lucide-react'
 import { API_BASE_URL } from '../services/api'
+import { useAuth } from '../auth/useAuth'
 
 export default function SettingsPage() {
+  const { user } = useAuth()
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
@@ -21,8 +23,8 @@ export default function SettingsPage() {
             <input value={API_BASE_URL || '(Same origin / Relative API)'} readOnly className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5" />
           </label>
           <label className="text-sm text-slate-700">
-            Current user
-            <input value={localStorage.getItem('health-assistant-user') || 'demo-user'} readOnly className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5" />
+            Signed in as
+            <input value={user?.email || ''} readOnly className="mt-2 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5" />
           </label>
         </div>
       </div>

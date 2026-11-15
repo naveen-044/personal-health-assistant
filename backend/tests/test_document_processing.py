@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 from pathlib import Path
 import tempfile
 import unittest
@@ -52,24 +53,32 @@ class DocumentProcessingTests(unittest.TestCase):
     def test_chunker_applies_configurable_size_and_overlap(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             pipeline = RAGPipeline(Path(directory) / 'docs', Path(directory) / 'chroma')
-            content = ' '.join(f'healthword{index}' for index in range(120))
+            try:
+                content = ' '.join(f'healthword{index}' for index in range(120))
 
-            chunks = pipeline._chunk_text(f'## Hydration\n{content}', chunk_size=120, overlap=30)
+                chunks = pipeline._chunk_text(f'## Hydration\n{content}', chunk_size=120, overlap=30)
 
-            self.assertGreater(len(chunks), 2)
-            for _, chunk in chunks:
-                self.assertLessEqual(len(chunk), 120)
-            first_body = chunks[0][1].split('\n', 1)[1]
-            second_body = chunks[1][1].split('\n', 1)[1]
-            self.assertTrue(set(first_body.split()) & set(second_body.split()))
-            pipeline.client.close()
+                self.assertGreater(len(chunks), 2)
+                for _, chunk in chunks:
+                    self.assertLessEqual(len(chunk), 120)
+                first_body = chunks[0][1].split('\n', 1)[1]
+                second_body = chunks[1][1].split('\n', 1)[1]
+                self.assertTrue(set(first_body.split()) & set(second_body.split()))
+            finally:
+                pipeline.client.close()
+                pipeline = None
+                gc.collect()
 
     def test_chunker_rejects_invalid_overlap(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             pipeline = RAGPipeline(Path(directory) / 'docs', Path(directory) / 'chroma')
-            with self.assertRaises(ValueError):
-                pipeline._chunk_text('## Health\nSome health guidance.', chunk_size=100, overlap=100)
-            pipeline.client.close()
+            try:
+                with self.assertRaises(ValueError):
+                    pipeline._chunk_text('## Health\nSome health guidance.', chunk_size=100, overlap=100)
+            finally:
+                pipeline.client.close()
+                pipeline = None
+                gc.collect()
 
 
 if __name__ == '__main__':

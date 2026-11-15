@@ -3,8 +3,9 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
+from backend.auth.dependencies import get_current_user
 from backend.config import settings
 from backend.database.store import store
 from backend.services.document_loader import sanitize_filename
@@ -13,22 +14,13 @@ from backend.services.rag_pipeline import rag_pipeline
 router = APIRouter()
 
 
-def get_current_user_id(request: Request | None = None) -> str:
-    if request is not None:
-        user_header = request.headers.get('x-user-id')
-        if user_header and user_header.strip():
-            return user_header.strip()
-    import os
-    user_id = os.getenv('CHAT_USER_ID', 'demo-user')
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authentication required.')
-    return user_id
-
-
 @router.post('/api/documents/upload')
 @router.post('/documents/upload')
-async def upload_document(request: Request, file: UploadFile = File(...)) -> dict:
-    user_id = get_current_user_id(request)
+async def upload_document(
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    user_id = user['user_id']
     if not file.filename:
         raise HTTPException(status_code=400, detail='A file is required.')
 
@@ -62,15 +54,15 @@ async def upload_document(request: Request, file: UploadFile = File(...)) -> dic
 
 @router.get('/api/documents')
 @router.get('/documents')
-def list_documents(request: Request) -> dict:
-    user_id = get_current_user_id(request)
+def list_documents(user: dict = Depends(get_current_user)) -> dict:
+    user_id = user['user_id']
     return {'documents': store.list_documents(user_id)}
 
 
 @router.delete('/api/documents/{document_id}')
 @router.delete('/documents/{document_id}')
-def delete_document(document_id: str, request: Request) -> dict:
-    user_id = get_current_user_id(request)
+def delete_document(document_id: str, user: dict = Depends(get_current_user)) -> dict:
+    user_id = user['user_id']
     document = store.get_document(user_id, document_id)
     if document is None:
         raise HTTPException(status_code=404, detail='Document not found for this user.')

@@ -9,4 +9,7 @@ chromadb
 python-multipart
 pymongo
 dnspython
+bcrypt>=4.2
+PyJWT>=2.10
+email-validator>=2.2
 pytest

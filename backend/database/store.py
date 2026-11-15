@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import datetime, timezone
 import logging
 from threading import Lock
 from typing import Any
+import uuid
 
 logger = logging.getLogger('uvicorn.error')
 
@@ -140,19 +142,113 @@ class InMemoryStore:
 
 
 class MongoStore:
-    def __init__(self, uri: str, db_name: str = 'health_assistant') -> None:
+    def __init__(self, uri: str, db_name: str = 'personal_health_assistant') -> None:
         import pymongo
         self.client = pymongo.MongoClient(uri, serverSelectionTimeoutMS=5000)
         self.client.admin.command('ping')
-        try:
-            default_db = self.client.get_default_database()
-            self.db = default_db if default_db is not None else self.client[db_name]
-        except Exception:
-            self.db = self.client[db_name]
+        self.db = self.client[db_name]
+        self.database_name = self.db.name
 
         self.profiles = self.db['profiles']
         self.conversations = self.db['conversations']
         self.documents = self.db['documents']
+        self.auth_users = self.db['users']
+        self.auth_sessions = self.db['auth_sessions']
+        self.auth_users.create_index('email', unique=True, name='users_email_unique')
+        self.auth_sessions.create_index('token_hash', unique=True, name='auth_sessions_token_hash_unique')
+        self.auth_sessions.create_index('expires_at', expireAfterSeconds=0, name='auth_sessions_expiry')
+        self.auth_sessions.create_index('user_id', name='auth_sessions_user_id')
+
+    def health_check(self, verify_write: bool = False) -> dict[str, Any]:
+        self.client.admin.command('ping')
+        collections = self.db.list_collection_names()
+        if 'users' not in collections:
+            raise RuntimeError('The users collection is unavailable.')
+
+        indexes = self.auth_users.index_information()
+        if not any(
+            index.get('key') == [('email', 1)] and index.get('unique') is True
+            for index in indexes.values()
+        ):
+            raise RuntimeError('The users email unique index is unavailable.')
+
+        self.auth_users.find_one({}, {'_id': True})
+        if verify_write:
+            checks = self.db['_health_checks']
+            probe_id = f'mongodb-health-{uuid.uuid4()}'
+            try:
+                checks.insert_one({'_id': probe_id, 'created_at': datetime.now(timezone.utc)})
+                if checks.find_one({'_id': probe_id}, {'_id': True}) is None:
+                    raise RuntimeError('MongoDB health-check read did not return the written probe.')
+            finally:
+                checks.delete_one({'_id': probe_id})
+
+        return {
+            'database': self.database_name,
+            'users_collection': True,
+            'users_email_unique_index': True,
+            'read_write': verify_write,
+        }
+
+    def create_auth_user(self, user: dict[str, Any]) -> dict[str, Any]:
+        record = deepcopy(user)
+        result = self.auth_users.insert_one(record)
+        record['_id'] = result.inserted_id
+        return record
+
+    def find_auth_user_by_email(self, email: str) -> dict[str, Any] | None:
+        return self.auth_users.find_one({'email': email})
+
+    def find_auth_user_by_id(self, user_id: str) -> dict[str, Any] | None:
+        from bson import ObjectId
+        from bson.errors import InvalidId
+
+        try:
+            object_id = ObjectId(user_id)
+        except (InvalidId, TypeError):
+            return None
+        return self.auth_users.find_one({'_id': object_id})
+
+    def create_auth_session(
+        self,
+        user_id: str,
+        token_hash: str,
+        expires_at: datetime,
+        remember_me: bool,
+    ) -> str:
+        result = self.auth_sessions.insert_one({
+            'user_id': user_id,
+            'token_hash': token_hash,
+            'expires_at': expires_at,
+            'remember_me': remember_me,
+            'created_at': datetime.now(timezone.utc),
+        })
+        return str(result.inserted_id)
+
+    def consume_auth_session(self, token_hash: str) -> dict[str, Any] | None:
+        from pymongo import ReturnDocument
+
+        return self.auth_sessions.find_one_and_delete({
+            'token_hash': token_hash,
+            'expires_at': {'$gt': datetime.now(timezone.utc)},
+        }, return_document=ReturnDocument.BEFORE)
+
+    def auth_session_exists(self, session_id: str, user_id: str) -> bool:
+        from bson import ObjectId
+        from bson.errors import InvalidId
+
+        try:
+            object_id = ObjectId(session_id)
+        except (InvalidId, TypeError):
+            return False
+        return self.auth_sessions.find_one({
+            '_id': object_id,
+            'user_id': user_id,
+            'expires_at': {'$gt': datetime.now(timezone.utc)},
+        }, {'_id': True}) is not None
+
+    def revoke_auth_session(self, token_hash: str) -> None:
+        self.auth_sessions.delete_one({'token_hash': token_hash})
 
     def get_or_create_profile(self, user_id: str) -> dict[str, Any]:
         profile = self.profiles.find_one({'user_id': user_id}, {'_id': False})
@@ -261,12 +357,16 @@ def create_store() -> InMemoryStore | MongoStore:
     from backend.config import settings
     if settings.MONGODB_URI:
         try:
-            mongo = MongoStore(settings.MONGODB_URI)
-            host_info = settings.MONGODB_URI.split('@')[-1] if '@' in settings.MONGODB_URI else 'MongoDB'
-            print(f"[Database] Connected to MongoDB: {host_info}")
+            mongo = MongoStore(settings.MONGODB_URI, settings.DATABASE_NAME)
+            logger.info('Connected to the configured MongoDB database.')
             return mongo
         except Exception as exc:
-            print(f"[Database] MongoDB connection failed ({exc}). Falling back to InMemoryStore.")
+            logger.error(
+                'MongoDB connection failed (%s). MongoDB-backed authentication is unavailable.',
+                type(exc).__name__,
+            )
+    else:
+        logger.warning('MONGODB_URI is not configured. MongoDB-backed authentication is unavailable.')
     return InMemoryStore()
 
 

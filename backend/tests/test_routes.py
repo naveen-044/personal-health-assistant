@@ -1,6 +1,9 @@
 import unittest
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
+from backend.auth.dependencies import get_optional_mongo_store
 from backend.app import app
 
 
@@ -22,45 +25,90 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(res2.status_code, 200)
         self.assertEqual(res2.json().get('status'), 'ok')
 
+    def test_database_health_reports_connected_store(self) -> None:
+        class HealthyStore:
+            def health_check(self) -> dict:
+                return {
+                    'database': 'personal_health_assistant',
+                    'users_collection': True,
+                    'users_email_unique_index': True,
+                    'read_write': False,
+                }
+
+        with patch.dict(app.dependency_overrides, {get_optional_mongo_store: lambda: HealthyStore()}):
+            response = self.client.get(
+                '/api/health/database',
+                headers={'Origin': 'http://localhost:5173'},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['database_connected'])
+        self.assertEqual(response.json()['database'], 'personal_health_assistant')
+        self.assertEqual(response.headers['access-control-allow-origin'], 'http://localhost:5173')
+        self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
+
+    def test_database_health_reports_unavailable_store(self) -> None:
+        with patch.dict(app.dependency_overrides, {get_optional_mongo_store: lambda: None}):
+            response = self.client.get('/api/health/database')
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.json()['detail']['database_connected'])
+
+    def test_database_health_reports_live_store_failure(self) -> None:
+        class UnhealthyStore:
+            def health_check(self) -> dict:
+                raise RuntimeError('database unavailable')
+
+        with patch.dict(app.dependency_overrides, {get_optional_mongo_store: lambda: UnhealthyStore()}):
+            response = self.client.get('/api/health/database')
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.json()['detail']['database_connected'])
+
+    def test_cors_does_not_allow_unconfigured_vercel_origins(self) -> None:
+        response = self.client.options(
+            '/api/auth/register',
+            headers={
+                'Origin': 'https://attacker.vercel.app',
+                'Access-Control-Request-Method': 'POST',
+            },
+        )
+
+        self.assertNotEqual(
+            response.headers.get('access-control-allow-origin'),
+            'https://attacker.vercel.app',
+        )
+
     def test_api_info_endpoint(self) -> None:
         res = self.client.get('/api')
         self.assertEqual(res.status_code, 200)
         self.assertIn('endpoints', res.json())
 
-    def test_chat_history_routes(self) -> None:
+    def test_chat_history_requires_authentication(self) -> None:
         res1 = self.client.get('/api/chat/history')
-        self.assertEqual(res1.status_code, 200)
-        self.assertIn('conversations', res1.json())
+        self.assertEqual(res1.status_code, 401)
 
         res2 = self.client.get('/chat/history')
-        self.assertEqual(res2.status_code, 200)
-        self.assertIn('conversations', res2.json())
+        self.assertEqual(res2.status_code, 401)
 
-    def test_delete_history_idempotent(self) -> None:
+    def test_delete_history_requires_authentication(self) -> None:
         res = self.client.delete('/api/chat/history/non-existent-id')
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json().get('status'), 'deleted')
+        self.assertEqual(res.status_code, 401)
 
-    def test_document_routes(self) -> None:
+    def test_document_routes_require_authentication(self) -> None:
         res1 = self.client.get('/api/documents')
-        self.assertEqual(res1.status_code, 200)
-        self.assertIn('documents', res1.json())
+        self.assertEqual(res1.status_code, 401)
 
         res2 = self.client.get('/documents')
-        self.assertEqual(res2.status_code, 200)
-        self.assertIn('documents', res2.json())
+        self.assertEqual(res2.status_code, 401)
 
-    def test_profile_routes(self) -> None:
+    def test_profile_routes_require_authentication(self) -> None:
         res1 = self.client.get('/api/profile')
-        self.assertEqual(res1.status_code, 200)
+        self.assertEqual(res1.status_code, 401)
 
         res2 = self.client.get('/profile')
-        self.assertEqual(res2.status_code, 200)
+        self.assertEqual(res2.status_code, 401)
 
-        res_put = self.client.put('/api/profile', json={'name': 'Jane Doe'})
-        self.assertEqual(res_put.status_code, 200)
-        self.assertEqual(res_put.json().get('name'), 'Jane Doe')
-
-        res_post = self.client.post('/api/profile', json={'name': 'Jane Post'})
-        self.assertEqual(res_post.status_code, 200)
-        self.assertEqual(res_post.json().get('name'), 'Jane Post')
+    def test_client_supplied_user_id_does_not_authenticate(self) -> None:
+        response = self.client.get('/api/chat/history', headers={'X-User-Id': 'somebody-else'})
+        self.assertEqual(response.status_code, 401)

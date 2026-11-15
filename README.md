@@ -5,11 +5,12 @@ This project is a medical-information assistant built with React + Vite on the f
 ## Features
 
 - Natural-language health assistant UI
+- MongoDB-backed accounts with password hashing, short-lived JWT access tokens, and rotating HttpOnly refresh sessions
 - Retrieval-augmented generation with ChromaDB and SentenceTransformers
 - Source-grounded answers and citation-like references
 - Document upload for PDF and TXT files
 - Optional user profile for personalized context
-- In-memory user-scoped conversation history and authorization checks
+- User-scoped conversation history and document authorization
 - Safety guidance and emergency escalation recommendations
 
 ## Project structure
@@ -21,7 +22,28 @@ This project is a medical-information assistant built with React + Vite on the f
 
 ## Setup
 
-### 1. Backend
+### 1. Configure MongoDB Atlas and authentication
+
+Authentication requires a reachable MongoDB Atlas cluster. From the project root, copy `.env.example` to `.env` and set:
+
+- `MONGODB_URI` to your Atlas connection string. Never commit the real URI.
+- `DATABASE_NAME` to the database to use (defaults to `personal_health_assistant`).
+- `JWT_SECRET_KEY` to a generated random value of at least 32 bytes. For example:
+  `python -c "import secrets; print(secrets.token_urlsafe(48))"`
+
+The backend uses the configured database and creates a `users` collection with a unique email index, plus an `auth_sessions` collection for hashed, expiring refresh sessions. It does not store accounts in the in-memory fallback. If Atlas is unavailable, authentication endpoints return `503` rather than accepting or storing accounts locally. Make sure your Atlas Network Access rules and database user permit the backend to connect.
+
+For local development, the refresh cookie uses `AUTH_COOKIE_SAMESITE=lax` and `AUTH_COOKIE_SECURE=false`. For HTTPS deployment on separate frontend/backend hostnames, set `AUTH_COOKIE_SECURE=true` and `AUTH_COOKIE_SAMESITE=none`; when possible, use frontend and API hostnames under the same custom domain and set an appropriate cookie domain.
+
+After replacing the placeholders in `.env`, verify Atlas access and the `users` collection/index with:
+
+```bash
+python scripts/check_mongodb.py
+```
+
+The check uses the application's existing MongoDB client, performs a read, writes and reads a uniquely named temporary record in `_health_checks`, then deletes it. It reports the selected database and never prints the connection string.
+
+### 2. Backend
 
 From the repository root, create and activate a virtual environment:
 
@@ -42,7 +64,7 @@ Start the API from the repository root:
 python -m uvicorn backend.app:app --reload --host 127.0.0.1 --port 8001
 ```
 
-### 2. Frontend
+### 3. Frontend
 
 ```bash
 cd frontend
@@ -52,8 +74,11 @@ npm run dev -- --host 127.0.0.1 --port 5174
 
 The frontend Axios client defaults to `http://127.0.0.1:8001`. To override it, copy
 `frontend/.env.example` to `frontend/.env`, set `VITE_API_BASE_URL`, and restart Vite.
+Sign-up and sign-in use `/api/auth/register` and `/api/auth/login`. Access tokens remain in
+memory; a short-lived access token is renewed after a page refresh using the HttpOnly refresh
+cookie. Chat, profile, history, and document endpoints require that access token.
 
-### 3. Document index
+### 4. Document index
 
 Place trusted public health PDFs or TXT files into `data/medical_documents/` and run:
 
@@ -94,4 +119,7 @@ Library should be reviewed and removed individually rather than purging the inde
 
 ## Environment variables
 
-Copy `.env.example` to `.env` and customize values before running the app.
+Copy `.env.example` to `.env` and customize the backend values before running the API. Copy
+`frontend/.env.example` to `frontend/.env` only when overriding the frontend API URL. For
+production, configure the same variables in the hosting provider's secret/environment settings;
+do not upload either `.env` file.
