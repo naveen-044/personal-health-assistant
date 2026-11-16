@@ -11,6 +11,7 @@ let refreshRequest = null
 const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+  timeout: 20000,
 })
 
 export function setAccessToken(value) {
@@ -22,7 +23,7 @@ export function refreshAccessToken() {
     refreshRequest = axios.post(
       `${API_BASE_URL}/api/auth/refresh`,
       {},
-      { withCredentials: true },
+      { withCredentials: true, timeout: 5000 },
     ).then((response) => {
       setAccessToken(response.data.access_token)
       return response.data

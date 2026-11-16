@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Bot,
   FileText,
@@ -9,61 +9,9 @@ import {
 } from 'lucide-react'
 import api from '../services/api'
 
-// Render simple Markdown-style headings, bullets, and bold text safely.
-function FormattedMessage({ content }) {
-  if (!content) return null
-
-  return (
-    <div className="space-y-1.5 text-sm leading-relaxed">
-      {content.split('\n').map((line, idx) => {
-        const trimmed = line.trim()
-
-        if (!trimmed) {
-          return <div key={idx} className="h-1" />
-        }
-
-        if (trimmed.startsWith('### ')) {
-          return (
-            <h4
-              key={idx}
-              className="pt-2 pb-0.5 text-[14px] font-semibold text-slate-900"
-            >
-              {trimmed.replace(/^###\s+/, '')}
-            </h4>
-          )
-        }
-
-        if (/^[-•*]\s+/.test(trimmed)) {
-          const itemText = trimmed.replace(/^[-•*]\s+/, '')
-          return (
-            <div
-              key={idx}
-              className="flex items-start gap-2 pl-1 text-slate-700"
-            >
-              <span className="select-none font-bold leading-5 text-brand-600">
-                •
-              </span>
-              <span className="flex-1">
-                <BoldParser text={itemText} />
-              </span>
-            </div>
-          )
-        }
-
-        return (
-          <p key={idx} className="text-slate-700">
-            <BoldParser text={trimmed} />
-          </p>
-        )
-      })}
-    </div>
-  )
-}
-
-function BoldParser({ text }) {
+// Safely parse **bold text** without dangerouslySetInnerHTML.
+const BoldParser = memo(function BoldParser({ text }) {
   if (!text) return null
-
-  // Split around **bold text** without interpreting HTML.
   const parts = text.split(/(\*\*.*?\*\*)/g)
 
   return (
@@ -76,12 +24,141 @@ function BoldParser({ text }) {
             </strong>
           )
         }
-
         return <span key={index}>{part}</span>
       })}
     </>
   )
-}
+})
+
+// Render simple Markdown: headings, tables, bullets, and bold text cleanly.
+const FormattedMessage = memo(function FormattedMessage({ content }) {
+  if (!content) return null
+
+  const lines = content.split('\n')
+  const blocks = []
+  let tableBuffer = []
+
+  const flushTable = () => {
+    if (tableBuffer.length > 0) {
+      blocks.push({ type: 'table', rows: [...tableBuffer] })
+      tableBuffer = []
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i]
+    const trimmed = rawLine.trim()
+
+    // Detect markdown table rows: | col | col |
+    if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2) {
+      // Check if it's a separator row like |---|---|
+      const isSeparator = /^\|[\s-:]+\|[\s-:]+\|?/.test(trimmed)
+      if (!isSeparator) {
+        const cells = trimmed
+          .slice(1, -1)
+          .split('|')
+          .map((c) => c.trim())
+        tableBuffer.push(cells)
+      }
+      continue
+    }
+
+    flushTable()
+
+    if (!trimmed) {
+      blocks.push({ type: 'space' })
+    } else if (trimmed.startsWith('### ')) {
+      blocks.push({ type: 'h3', text: trimmed.replace(/^###\s+/, '') })
+    } else if (trimmed.startsWith('## ')) {
+      blocks.push({ type: 'h2', text: trimmed.replace(/^##\s+/, '') })
+    } else if (trimmed.startsWith('# ')) {
+      blocks.push({ type: 'h1', text: trimmed.replace(/^#\s+/, '') })
+    } else if (/^[-•*]\s+/.test(trimmed)) {
+      blocks.push({ type: 'bullet', text: trimmed.replace(/^[-•*]\s+/, '') })
+    } else {
+      blocks.push({ type: 'p', text: trimmed })
+    }
+  }
+  flushTable()
+
+  return (
+    <div className="space-y-1.5 text-sm leading-relaxed">
+      {blocks.map((block, idx) => {
+        if (block.type === 'space') {
+          return <div key={idx} className="h-1" />
+        }
+
+        if (block.type === 'h1' || block.type === 'h2' || block.type === 'h3') {
+          return (
+            <h4
+              key={idx}
+              className="pt-2 pb-0.5 text-[14px] font-semibold text-slate-900"
+            >
+              <BoldParser text={block.text} />
+            </h4>
+          )
+        }
+
+        if (block.type === 'table') {
+          if (block.rows.length === 0) return null
+          const header = block.rows[0]
+          const bodyRows = block.rows.slice(1)
+
+          return (
+            <div
+              key={idx}
+              className="my-2 max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs [-webkit-overflow-scrolling:touch]"
+            >
+              <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
+                {header && (
+                  <thead className="bg-slate-50 font-semibold text-slate-800">
+                    <tr>
+                      {header.map((col, colIdx) => (
+                        <th key={colIdx} className="px-3 py-2 whitespace-nowrap">
+                          <BoldParser text={col} />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                )}
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {bodyRows.map((row, rowIdx) => (
+                    <tr key={rowIdx} className="hover:bg-slate-50/50">
+                      {row.map((cell, cellIdx) => (
+                        <td key={cellIdx} className="px-3 py-2 align-top">
+                          <BoldParser text={cell} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+
+        if (block.type === 'bullet') {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1 text-slate-700">
+              <span className="select-none font-bold leading-5 text-brand-600">
+                •
+              </span>
+              <span className="flex-1">
+                <BoldParser text={block.text} />
+              </span>
+            </div>
+          )
+        }
+
+        return (
+          <p key={idx} className="text-slate-700">
+            <BoldParser text={block.text} />
+          </p>
+        )
+      })}
+    </div>
+  )
+})
 
 function formatTime(value) {
   if (!value) {
@@ -91,7 +168,6 @@ function formatTime(value) {
     })
   }
 
-  // Preserve an already formatted time such as "03:17 PM".
   if (typeof value === 'string' && /am|pm/i.test(value)) return value
 
   const date = new Date(value)
@@ -111,6 +187,99 @@ function getApiErrorMessage(error, fallback) {
   return fallback
 }
 
+// Memoized individual message item to prevent re-rendering when typing
+const ChatMessageItem = memo(function ChatMessageItem({ message }) {
+  const isUser = message.role === 'user'
+
+  return (
+    <div
+      className={`flex items-end gap-2.5 ${
+        isUser ? 'justify-end' : 'justify-start'
+      }`}
+    >
+      {!isUser && (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700 shadow-xs">
+          <Bot className="h-4 w-4" />
+        </div>
+      )}
+
+      <div
+        className={`max-w-2xl rounded-2xl px-4 py-3 shadow-xs ${
+          isUser
+            ? 'rounded-br-xs bg-brand-600 text-white'
+            : 'rounded-bl-xs border border-slate-200/80 bg-slate-50/80 text-slate-800'
+        }`}
+      >
+        {isUser ? (
+          <p className="whitespace-pre-wrap text-sm font-medium leading-relaxed">
+            {message.content}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <FormattedMessage content={message.content} />
+
+            {Array.isArray(message.sources) && message.sources.length > 0 && (
+              <div className="mt-3 border-t border-slate-200/70 pt-2">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                  <span className="flex items-center gap-1 font-semibold text-slate-600">
+                    <FileText className="h-3 w-3 text-brand-600" />
+                    Sources:
+                  </span>
+                  {message.sources.map((source, sourceIndex) => (
+                    <div
+                      key={`${source.section || source.source || 'source'}-${sourceIndex}`}
+                      className="flex flex-col gap-1"
+                    >
+                      <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        {source.section || source.source || 'Health document'}
+                      </span>
+                      {Array.isArray(source.references) &&
+                        source.references.map((reference) =>
+                          /^https?:\/\//i.test(reference) ? (
+                            <a
+                              key={reference}
+                              href={reference}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="max-w-64 truncate text-[10px] text-brand-700 underline"
+                            >
+                              {reference}
+                            </a>
+                          ) : null,
+                        )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {message.safety_notice && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-amber-200/60 bg-amber-50/80 px-2.5 py-1.5 text-[11px] text-amber-800">
+                <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span>{message.safety_notice}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <p
+          className={`mt-1.5 text-[10px] ${
+            isUser ? 'text-right text-brand-100' : 'text-slate-400'
+          }`}
+        >
+          {formatTime(message.created_at)}
+        </p>
+      </div>
+
+      {isUser && (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-600">
+          <User className="h-4 w-4" />
+        </div>
+      )}
+    </div>
+  )
+})
+
 export default function ChatPage() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -119,11 +288,21 @@ export default function ChatPage() {
   const [resetting, setResetting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [conversationId, setConversationId] = useState(null)
+  const messagesContainerRef = useRef(null)
   const messagesEndRef = useRef(null)
   const requestInProgressRef = useRef(false)
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  // Scroll to bottom smoothly on desktop, instantly without jank on mobile
+  const scrollToBottom = useCallback((smooth = false) => {
+    if (!messagesContainerRef.current) return
+    const container = messagesContainerRef.current
+
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+    if (isMobile || !smooth) {
+      container.scrollTop = container.scrollHeight
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
   }, [])
 
   // Restore the most recent saved conversation after a page refresh.
@@ -142,7 +321,6 @@ export default function ChatPage() {
           ? response.data.conversations
           : []
 
-        // Ignore malformed entries and use the most recent conversation.
         const latest = [...conversations]
           .filter((item) => item && item.conversation_id)
           .sort((a, b) => {
@@ -162,10 +340,12 @@ export default function ChatPage() {
       } catch (error) {
         if (!cancelled) {
           console.error('Error loading chat history:', error)
-          setErrorMessage(getApiErrorMessage(
-            error,
-            'Could not load saved chat history. Check that the backend is running, then refresh the page.',
-          ))
+          setErrorMessage(
+            getApiErrorMessage(
+              error,
+              'Could not load saved chat history. Check that the backend is running, then refresh the page.',
+            ),
+          )
         }
       } finally {
         if (!cancelled) setHistoryLoading(false)
@@ -178,9 +358,10 @@ export default function ChatPage() {
     }
   }, [])
 
+  // Scroll when messages count changes or loading flips
   useEffect(() => {
-    scrollToBottom()
-  }, [messages, loading, scrollToBottom])
+    requestAnimationFrame(() => scrollToBottom(false))
+  }, [messages.length, loading, scrollToBottom])
 
   const sendQuestion = async () => {
     const question = input.trim()
@@ -242,8 +423,6 @@ export default function ChatPage() {
     }
   }
 
-  // Delete the saved conversation first. Only clear the screen if deletion succeeds.
-  // Otherwise a refresh would load the still-saved conversation again.
   const resetThread = async () => {
     if (loading || resetting || historyLoading) return
 
@@ -257,7 +436,6 @@ export default function ChatPage() {
             `/api/chat/history/${encodeURIComponent(conversationId)}`,
           )
         } catch (delErr) {
-          // If 404, the conversation was already gone on the server, which is fine
           if (delErr.response?.status !== 404) {
             throw delErr
           }
@@ -272,7 +450,7 @@ export default function ChatPage() {
       setErrorMessage(
         getApiErrorMessage(
           error,
-          'The chat could not be deleted from saved history, so it may return after refresh. Check the backend DELETE /api/chat/history/{conversation_id} route and try again.',
+          'The chat could not be deleted from saved history. Please try again.',
         ),
       )
     } finally {
@@ -281,17 +459,18 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[76vh] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-soft">
-      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-brand-50 p-2 text-brand-700 shadow-sm">
+    <div className="flex h-[calc(100dvh-7.5rem)] min-h-[380px] md:h-[76vh] flex-col overflow-hidden rounded-2xl md:rounded-3xl border border-slate-200 bg-white shadow-soft">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 md:px-5 md:py-4">
+        <div className="flex items-center gap-2.5">
+          <div className="rounded-xl bg-brand-50 p-2 text-brand-700 shadow-xs">
             <Bot className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs font-medium text-slate-500">
+            <p className="text-[11px] font-medium text-slate-500">
               Clinical Support Assistant
             </p>
-            <h2 className="font-semibold text-slate-800">
+            <h2 className="text-sm font-semibold text-slate-800 md:text-base">
               Health Support &amp; RAG Knowledge Base
             </h2>
           </div>
@@ -301,137 +480,54 @@ export default function ChatPage() {
           type="button"
           onClick={resetThread}
           disabled={loading || resetting || historyLoading}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
           title="Delete the current saved conversation"
         >
           <Trash2 className="h-3.5 w-3.5" />
-          {resetting ? 'Resetting…' : 'Reset Chat'}
+          <span className="hidden sm:inline">{resetting ? 'Resetting…' : 'Reset Chat'}</span>
         </button>
       </div>
 
       {errorMessage && (
         <div
           role="alert"
-          className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
+          className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-xs md:text-sm text-amber-900"
         >
           {errorMessage}
         </div>
       )}
 
-      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+      {/* Message List */}
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 space-y-4 overflow-y-auto px-3.5 py-4 sm:px-5 sm:py-5 overscroll-contain will-change-scroll [-webkit-overflow-scrolling:touch]"
+      >
         {historyLoading && (
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 text-sm text-slate-600">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs sm:text-sm text-slate-600">
+            <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-teal-700/20 border-t-teal-700" />
             Loading saved conversation…
           </div>
         )}
 
         {!historyLoading && messages.length === 0 && !loading && (
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5 text-sm text-slate-600">
-            <p className="mb-1 font-medium text-slate-800">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 sm:p-5 text-xs sm:text-sm text-slate-600">
+            <p className="mb-1 font-semibold text-slate-800">
               Welcome to your Personal Health Assistant!
             </p>
             <p className="leading-relaxed">
               Ask a general health question, such as “What should I do for a
               fever?”, “Cold vs flu symptoms”, or “What is hydration?”. Answers
-              may be based on indexed health documents. This chatbot is
-              educational and does not replace professional medical advice.
+              are grounded in medical references. Educational only; does not replace professional medical care.
             </p>
           </div>
         )}
 
-        {messages.map((message, index) => {
-          const isUser = message.role === 'user'
-
-          return (
-            <div
-              key={`${message.role}-${message.created_at || index}-${index}`}
-              className={`flex items-end gap-2.5 ${
-                isUser ? 'justify-end' : 'justify-start'
-              }`}
-            >
-              {!isUser && (
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700 shadow-xs">
-                  <Bot className="h-4 w-4" />
-                </div>
-              )}
-
-              <div
-                className={`max-w-2xl rounded-2xl px-4 py-3 shadow-xs ${
-                  isUser
-                    ? 'rounded-br-xs bg-brand-600 text-white'
-                    : 'rounded-bl-xs border border-slate-200/80 bg-slate-50/80 text-slate-800'
-                }`}
-              >
-                {isUser ? (
-                  <p className="whitespace-pre-wrap text-sm font-medium leading-relaxed">
-                    {message.content}
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    <FormattedMessage content={message.content} />
-
-                    {Array.isArray(message.sources) &&
-                      message.sources.length > 0 && (
-                        <div className="mt-3 border-t border-slate-200/70 pt-2">
-                          <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                            <span className="flex items-center gap-1 font-semibold text-slate-600">
-                              <FileText className="h-3 w-3 text-brand-600" />
-                              Sources:
-                            </span>
-                            {message.sources.map((source, sourceIndex) => (
-                              <div
-                                key={`${source.section || source.source || 'source'}-${sourceIndex}`}
-                                className="flex flex-col gap-1"
-                              >
-                                <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                                  {source.section || source.source || 'Health document'}
-                                </span>
-                                {Array.isArray(source.references) &&
-                                  source.references.map((reference) =>
-                                    /^https?:\/\//i.test(reference) ? (
-                                      <a
-                                        key={reference}
-                                        href={reference}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="max-w-64 truncate text-[10px] text-brand-700 underline"
-                                      >
-                                        {reference}
-                                      </a>
-                                    ) : null,
-                                  )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                    {message.safety_notice && (
-                      <div className="flex items-center gap-1.5 rounded-lg border border-amber-200/60 bg-amber-50/80 px-2.5 py-1.5 text-[11px] text-amber-800">
-                        <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-600" />
-                        <span>{message.safety_notice}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <p
-                  className={`mt-1.5 text-[10px] ${
-                    isUser ? 'text-right text-brand-100' : 'text-slate-400'
-                  }`}
-                >
-                  {formatTime(message.created_at)}
-                </p>
-              </div>
-
-              {isUser && (
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-600">
-                  <User className="h-4 w-4" />
-                </div>
-              )}
-            </div>
-          )
-        })}
+        {messages.map((message, index) => (
+          <ChatMessageItem
+            key={`${message.role}-${message.created_at || index}-${index}`}
+            message={message}
+          />
+        ))}
 
         {loading && (
           <div className="flex items-end justify-start gap-2.5">
@@ -456,10 +552,11 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t border-slate-200 bg-slate-50/40 p-4">
-        <div className="flex gap-3">
+      {/* Input Bar */}
+      <div className="border-t border-slate-200 bg-slate-50/40 p-2.5 sm:p-4">
+        <div className="flex gap-2 sm:gap-3">
           <textarea
-            rows={2}
+            rows={1}
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
@@ -473,17 +570,19 @@ export default function ChatPage() {
               }
             }}
             disabled={historyLoading || resetting}
-            className="w-full resize-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none ring-0 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
+            enterKeyHint="send"
+            autoCapitalize="sentences"
+            className="w-full resize-none rounded-xl sm:rounded-2xl border border-slate-300 bg-white px-3 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm text-slate-800 outline-none ring-0 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
             placeholder="Ask a health question (e.g. fever remedies, cold vs flu, hydration)…"
           />
           <button
             type="button"
             onClick={sendQuestion}
             disabled={loading || resetting || historyLoading || !input.trim()}
-            className="inline-flex items-center justify-center rounded-2xl bg-brand-600 px-5 text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-brand-600"
+            className="inline-flex shrink-0 items-center justify-center rounded-xl sm:rounded-2xl bg-brand-600 px-3.5 py-2 sm:px-5 sm:py-3 text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-brand-600"
             title="Send message"
           >
-            <SendHorizontal className="h-5 w-5" />
+            <SendHorizontal className="h-4 w-4 sm:h-5 sm:w-5" />
           </button>
         </div>
       </div>

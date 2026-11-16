@@ -1,14 +1,16 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { BookOpenText, House, LogOut, MessageSquareText, Settings, UserCircle2 } from 'lucide-react'
 import { AuthProvider } from './auth/AuthContext'
 import { useAuth } from './auth/useAuth'
-import LandingPage from './pages/LandingPage'
-import ChatPage from './pages/ChatPage'
-import LibraryPage from './pages/LibraryPage'
-import LoginPage from './pages/LoginPage'
-import ProfilePage from './pages/ProfilePage'
-import RegisterPage from './pages/RegisterPage'
-import SettingsPage from './pages/SettingsPage'
+
+const LandingPage = lazy(() => import('./pages/LandingPage'))
+const ChatPage = lazy(() => import('./pages/ChatPage'))
+const LibraryPage = lazy(() => import('./pages/LibraryPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const RegisterPage = lazy(() => import('./pages/RegisterPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 
 const navItems = [
   { to: '/', label: 'Home', icon: House },
@@ -24,6 +26,15 @@ function LoadingScreen() {
       <span className="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-teal-700/20 border-t-teal-700" />
       Restoring your secure session…
     </main>
+  )
+}
+
+function PageFallback() {
+  return (
+    <div className="flex h-64 items-center justify-center text-sm font-medium text-slate-500">
+      <span className="mr-2.5 h-4 w-4 animate-spin rounded-full border-2 border-teal-700/20 border-t-teal-700" />
+      Loading…
+    </div>
   )
 }
 
@@ -56,7 +67,7 @@ function AppShell() {
     }
   }
 
-  const navClass = (isActive, compact = false) => `inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
+  const navClass = (isActive, compact = false) => `inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm font-medium transition whitespace-nowrap ${
     isActive
       ? 'bg-teal-50 text-teal-800 ring-1 ring-teal-100'
       : `text-slate-600 hover:bg-slate-50 ${compact ? 'border border-slate-200' : ''}`
@@ -64,7 +75,7 @@ function AppShell() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800">
-      <div className="mx-auto flex max-w-7xl gap-6 p-4 md:p-6">
+      <div className="mx-auto flex max-w-7xl gap-4 p-3 sm:gap-6 sm:p-4 md:p-6">
         <aside className="hidden w-72 shrink-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-soft md:block">
           <Link to="/" className="mb-6 block px-3">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Personal Health</p>
@@ -92,22 +103,24 @@ function AppShell() {
         </aside>
 
         <main className="min-w-0 flex-1">
-          <header className="mb-6 rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-soft md:hidden">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <Link to="/" className="text-sm font-semibold text-slate-900">Personal Health Assistant</Link>
-              <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
+          <header className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-soft md:hidden">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <Link to="/" className="text-sm font-bold text-slate-900">Personal Health Assistant</Link>
+              <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
                 <LogOut className="h-3.5 w-3.5" /> Sign out
               </button>
             </div>
-            <nav className="flex flex-wrap gap-2" aria-label="Main navigation">
+            <nav className="flex gap-1.5 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch]" aria-label="Main navigation">
               {navItems.map(({ to, label, icon: Icon }) => (
                 <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => navClass(isActive, true)}>
-                  <Icon className="h-4 w-4" /> {label}
+                  <Icon className="h-3.5 w-3.5" /> {label}
                 </NavLink>
               ))}
             </nav>
           </header>
-          <Outlet />
+          <Suspense fallback={<PageFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>
@@ -118,21 +131,23 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />
-          <Route path="/register" element={<GuestOnly><RegisterPage /></GuestOnly>} />
-          <Route element={<RequireAuth />}>
-            <Route element={<AppShell />}>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/chat" element={<ChatPage />} />
-              <Route path="/documents" element={<LibraryPage />} />
-              <Route path="/library" element={<Navigate to="/documents" replace />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />
+            <Route path="/register" element={<GuestOnly><RegisterPage /></GuestOnly>} />
+            <Route element={<RequireAuth />}>
+              <Route element={<AppShell />}>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/chat" element={<ChatPage />} />
+                <Route path="/documents" element={<LibraryPage />} />
+                <Route path="/library" element={<Navigate to="/documents" replace />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   )
