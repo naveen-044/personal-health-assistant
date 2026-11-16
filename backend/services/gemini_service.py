@@ -11,6 +11,10 @@ logger = logging.getLogger('uvicorn.error')
 
 GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 DEFAULT_GEMINI_MODELS = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
     'gemini-3-flash-preview',
     'gemini-3.5-flash-lite',
     'gemini-3.5-flash',
@@ -105,9 +109,15 @@ def parse_image_payload(image_str: str) -> dict[str, str] | None:
 def resolve_models_to_try(model_name: str | None = None) -> list[str]:
     """Return an ordered list of models to try, placing high-speed active models first."""
     if not model_name or model_name in ('gemini-3.8-flash', 'pha-0.1.1', 'gemini', 'pha'):
-        # 3.8-flash currently encounters frequent 503 capacity spikes; gemini-3-flash-preview
-        # is the ultra-fast active endpoint with ~1.2s response latency.
-        return ['gemini-3-flash-preview', 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.8-flash']
+        return [
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+            'gemini-3-flash-preview',
+            'gemini-3.5-flash-lite',
+            'gemini-3.5-flash',
+            'gemini-3.8-flash',
+        ]
 
     cleaned = model_name.strip()
     if cleaned in DEFAULT_GEMINI_MODELS:

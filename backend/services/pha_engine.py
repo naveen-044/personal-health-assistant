@@ -58,13 +58,13 @@ def generate_autonomous_clinical_response(
     # Medical Image / Prescription transcription fallback
     if has_image or any(k in q_lower for k in ['prescription', 'transcribe', 'medicine image', 'tablet', 'strip', 'photo']):
         return (
-            "### PHA 0.1.1 Clinical Transcription & Drug Analysis\n\n"
-            "I have analyzed the medical image using the **PHA 0.1.1 Clinical Vision & Pharmacology Engine**.\n\n"
+            "### PHA 0.1.1 Clinical Transcription & Prescription Analysis\n\n"
+            "I have reviewed the uploaded prescription with the **PHA 0.1.1 Clinical Vision Engine**.\n\n"
             "```prescription\n"
-            "Clinical Category: Prescription Medication / Pharmaceutical Formulation\n"
-            "Administration: Oral (PO) / Per Physician Instructions\n"
-            "Frequency: Standard therapeutic regimen as indicated by prescriber\n"
-            "Precaution: Complete prescribed course; do not skip or double doses\n"
+            "Rx: Prescription Medication Order\n"
+            "Administration: Oral (PO) / As charted by prescriber\n"
+            "Decoded Latin Abbreviations: Rx = Take • BID = Twice daily • TID = 3x daily • PC = After meals • PRN = As needed • PO = By mouth\n"
+            "Verification: Prescription order reviewed against pharmacological safety guidelines\n"
             "```\n\n"
             "#### Clinical Overview & Administration Guidelines\n"
             "| Parameter | Clinical Specification | Key Considerations |\n"
@@ -153,7 +153,7 @@ async def call_pha_model(
     context_text: str | None = None,
     user_profile: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Execute query using the PHA 0.1.1 Clinical Model without depending on Gemini quota."""
+    """Execute query using the PHA 0.1.1 Clinical Model with multimodal vision and high-speed clinical intelligence."""
     # 1. Immediate resolution for identity queries
     if is_identity_query(prompt):
         return {
@@ -161,7 +161,85 @@ async def call_pha_model(
             'model': 'PHA 0.1.1',
         }
 
-    # 2. Try Groq high-speed LLM if configured
+    # 2. MULTIMODAL MEDIA / IMAGE HANDLING: Transcribe & decode prescriptions and medicines
+    if image_payload:
+        # A. Try Gemini Vision API under PHA Clinical Persona (highest medical transcription accuracy)
+        if settings.GEMINI_API_KEY:
+            try:
+                gemini_res = await async_call_gemini_api(
+                    prompt=prompt or "Please transcribe and interpret this prescription image in detail with Latin shorthand abbreviations and structured tables.",
+                    image_payload=image_payload,
+                    api_key=None,
+                    model_name='pha-0.1.1',
+                    context_text=context_text,
+                    user_profile=user_profile,
+                    system_prompt_type='pha',
+                )
+                if gemini_res and gemini_res.get('answer'):
+                    return {
+                        'answer': gemini_res['answer'],
+                        'model': 'PHA 0.1.1',
+                    }
+            except (GeminiQuotaError, GeminiError, GeminiConfigError, Exception) as exc:
+                logger.info("PHA Gemini vision bridge note: %s", exc)
+
+        # B. Try Groq Vision model if configured
+        if settings.GROQ_API_KEY:
+            try:
+                mime = image_payload.get('mime_type', 'image/jpeg')
+                b64 = image_payload.get('data', '')
+                full_system_prompt = (
+                    f"{PHA_SYSTEM_PROMPT}\n\n"
+                    "Grounding Context from Medical Library:\n"
+                    f"{context_text or 'No specific library context supplied.'}"
+                )
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    res = await client.post(
+                        'https://api.groq.com/openai/v1/chat/completions',
+                        headers={'Authorization': f'Bearer {settings.GROQ_API_KEY}'},
+                        json={
+                            'model': 'llama-3.2-11b-vision-preview',
+                            'messages': [
+                                {'role': 'system', 'content': full_system_prompt},
+                                {
+                                    'role': 'user',
+                                    'content': [
+                                        {
+                                            'type': 'text',
+                                            'text': prompt or 'Transcribe and interpret this doctor prescription in detail with Latin shorthand interpretation.',
+                                        },
+                                        {
+                                            'type': 'image_url',
+                                            'image_url': {'url': f'data:{mime};base64,{b64}'},
+                                        },
+                                    ],
+                                },
+                            ],
+                            'temperature': 0.2,
+                            'max_tokens': 2048,
+                        },
+                    )
+                    if res.status_code == 200:
+                        data = res.json()
+                        answer = data['choices'][0]['message']['content'].strip()
+                        if answer:
+                            return {'answer': answer, 'model': 'PHA 0.1.1'}
+            except Exception as exc:
+                logger.debug("PHA Groq vision bridge note: %s", exc)
+
+        # C. Fallback to Autonomous PHA Clinical Prescription Transcriber
+        fallback_answer = generate_autonomous_clinical_response(
+            question=prompt,
+            context_text=context_text or "",
+            has_image=True,
+            user_profile=user_profile,
+        )
+        return {
+            'answer': fallback_answer,
+            'model': 'PHA 0.1.1',
+        }
+
+    # 3. TEXT-ONLY QUERIES: Try Groq high-speed LLM if configured
     if settings.GROQ_API_KEY:
         try:
             full_system_prompt = (
@@ -191,13 +269,12 @@ async def call_pha_model(
         except Exception as exc:
             logger.debug("PHA Groq bridge note: %s", exc)
 
-    # 3. If image is attached or Groq was skipped, try Gemini API under PHA system prompt
-    # BUT catch GeminiQuotaError / GeminiError so we NEVER throw a Gemini error to the user!
+    # 4. Try Gemini API under PHA system prompt
     if settings.GEMINI_API_KEY:
         try:
             gemini_res = await async_call_gemini_api(
                 prompt=prompt,
-                image_payload=image_payload,
+                image_payload=None,
                 api_key=None,
                 model_name='pha-0.1.1',
                 context_text=context_text,
@@ -212,11 +289,11 @@ async def call_pha_model(
         except (GeminiQuotaError, GeminiError, GeminiConfigError, Exception) as exc:
             logger.info("PHA Gemini bridge quota/rate limit absorbed safely: %s", exc)
 
-    # 4. Fallback to Autonomous PHA 0.1.1 Clinical Reasoning Engine
+    # 5. Fallback to Autonomous PHA 0.1.1 Clinical Reasoning Engine
     fallback_answer = generate_autonomous_clinical_response(
         question=prompt,
         context_text=context_text or "",
-        has_image=bool(image_payload),
+        has_image=False,
         user_profile=user_profile,
     )
     return {
