@@ -195,9 +195,11 @@ export function ChatProvider({ children }) {
       const codeParam = urlParams.get('c') || urlParams.get('share')
       let target = null
 
-      if (codeParam && loadedConvs.length > 0) {
+      const list = Array.isArray(loadedConvs) ? loadedConvs : []
+
+      if (codeParam && list.length > 0) {
         const decodedId = decodeChatCode(codeParam)
-        target = loadedConvs.find(
+        target = list.find(
           (c) =>
             c.conversation_id === decodedId ||
             c.chat_code === codeParam ||
@@ -205,8 +207,8 @@ export function ChatProvider({ children }) {
         )
       }
 
-      if (!target && loadedConvs.length > 0) {
-        const sorted = [...loadedConvs].sort((a, b) => {
+      if (!target && list.length > 0) {
+        const sorted = [...list].sort((a, b) => {
           const aTime = new Date(a.updated_at || a.created_at || 0).getTime()
           const bTime = new Date(b.updated_at || b.created_at || 0).getTime()
           return bTime - aTime

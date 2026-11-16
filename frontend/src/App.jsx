@@ -341,9 +341,9 @@ function AppShell() {
       <div className="border-t border-slate-300 pt-3 mt-auto shrink-0">
         <div className="rounded-xl border border-slate-300 bg-slate-50 p-2.5 mb-2">
           <p className="truncate text-xs font-semibold text-slate-800">
-            {user.full_name || 'Health User'}
+            {user?.full_name || 'Health User'}
           </p>
-          <p className="truncate text-[11px] text-slate-500">{user.email}</p>
+          <p className="truncate text-[11px] text-slate-500">{user?.email || ''}</p>
         </div>
         <button
           type="button"
@@ -421,7 +421,7 @@ function AppShell() {
             >
               <UserCircle2 className="h-4 w-4 text-teal-700" />
               <span className="hidden sm:inline truncate max-w-32">
-                {user.full_name}
+                {user?.full_name || 'Profile'}
               </span>
             </Link>
           </div>

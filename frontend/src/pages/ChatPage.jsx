@@ -658,6 +658,7 @@ export default function ChatPage() {
     renameConversation,
     setEditingConvId,
     setEditTitleText,
+    loadingHistory,
   } = useChat()
 
   const [input, setInput] = useState('')

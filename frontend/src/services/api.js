@@ -5,7 +5,10 @@ export const API_BASE_URL = rawBaseUrl
   ? rawBaseUrl.replace(/\/+$/, '')
   : (import.meta.env.DEV ? 'http://127.0.0.1:8001' : '')
 
-let accessToken = null
+let accessToken =
+  typeof window !== 'undefined'
+    ? localStorage.getItem('pha_access_token')
+    : null
 let refreshRequest = null
 
 const api = axios.create({
@@ -16,6 +19,13 @@ const api = axios.create({
 
 export function setAccessToken(value) {
   accessToken = value
+  if (typeof window !== 'undefined') {
+    if (value) {
+      localStorage.setItem('pha_access_token', value)
+    } else {
+      localStorage.removeItem('pha_access_token')
+    }
+  }
 }
 
 export function refreshAccessToken() {
