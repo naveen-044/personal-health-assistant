@@ -149,6 +149,30 @@ class InMemoryStore:
             self.feedback.append(record)
             return deepcopy(record)
 
+    def get_conversation(self, user_id: str, conversation_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            for item in self.conversations.get(user_id, []):
+                if item['conversation_id'] == conversation_id:
+                    return deepcopy(item)
+            return None
+
+    def get_public_conversation(self, conversation_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            for user_convs in self.conversations.values():
+                for item in user_convs:
+                    if item['conversation_id'] == conversation_id:
+                        return deepcopy(item)
+            return None
+
+    def update_conversation_title(self, user_id: str, conversation_id: str, title: str) -> bool:
+        with self._lock:
+            conversations = self.conversations.get(user_id, [])
+            for item in conversations:
+                if item['conversation_id'] == conversation_id:
+                    item['title'] = (title or '').strip() or 'Untitled Chat'
+                    return True
+            return False
+
     def delete_conversation(self, user_id: str, conversation_id: str) -> bool:
         with self._lock:
             conversations = self.conversations.get(user_id, [])
@@ -463,6 +487,25 @@ class MongoStore:
             except Exception as exc:
                 logger.warning('Feedback insert error: %s', exc)
         return record
+
+    def get_conversation(self, user_id: str, conversation_id: str) -> dict[str, Any] | None:
+        return self.conversations.find_one(
+            {'user_id': user_id, 'conversation_id': conversation_id},
+            {'_id': False, 'user_id': False},
+        )
+
+    def get_public_conversation(self, conversation_id: str) -> dict[str, Any] | None:
+        return self.conversations.find_one(
+            {'conversation_id': conversation_id},
+            {'_id': False, 'user_id': False},
+        )
+
+    def update_conversation_title(self, user_id: str, conversation_id: str, title: str) -> bool:
+        result = self.conversations.update_one(
+            {'user_id': user_id, 'conversation_id': conversation_id},
+            {'$set': {'title': (title or '').strip() or 'Untitled Chat'}},
+        )
+        return result.modified_count > 0 or result.matched_count > 0
 
     def delete_conversation(self, user_id: str, conversation_id: str) -> bool:
         result = self.conversations.delete_one({'user_id': user_id, 'conversation_id': conversation_id})

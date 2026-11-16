@@ -31,6 +31,7 @@ class SourceEntry(BaseModel):
 
 class ChatResponse(BaseModel):
     conversation_id: str
+    chat_code: str | None = None
     answer: str
     sources: list[SourceEntry] = Field(default_factory=list)
     safety_notice: str = ''

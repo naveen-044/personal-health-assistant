@@ -2,17 +2,25 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Camera,
   Check,
+  Clock,
   Copy,
   Edit3,
   FileText,
+  History,
   ImagePlus,
+  MessageSquare,
   Mic,
   MicOff,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
+  Plus,
   SendHorizontal,
+  Share2,
   ShieldAlert,
   Sparkles,
   Square,
+  Stethoscope,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -202,6 +210,123 @@ function CameraCaptureModal({ isOpen, onClose, onCapture }) {
               </button>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Encrypted / Encoded Chat Code helpers
+export function encodeChatCode(conversationId) {
+  if (!conversationId) return ''
+  try {
+    return (
+      'pha_' +
+      btoa(conversationId)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '')
+    )
+  } catch (e) {
+    return 'pha_' + conversationId
+  }
+}
+
+export function decodeChatCode(code) {
+  if (!code) return ''
+  let cleaned = code.startsWith('pha_') ? code.slice(4) : code
+  cleaned = cleaned.replace(/-/g, '+').replace(/_/g, '/')
+  while (cleaned.length % 4) cleaned += '='
+  try {
+    return atob(cleaned)
+  } catch (e) {
+    return cleaned
+  }
+}
+
+// Share Modal for Encrypted Share Links
+function ShareModal({ isOpen, onClose, conversationId, chatTitle, chatCode }) {
+  const [copied, setCopied] = useState(false)
+  if (!isOpen) return null
+
+  const activeCode = chatCode || encodeChatCode(conversationId)
+  const shareUrl = `${window.location.origin}/chat?c=${encodeURIComponent(activeCode)}`
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch (err) {
+      console.error('Failed to copy share link:', err)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
+              <Share2 className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Share Clinical Conversation</h3>
+              <p className="text-[11px] text-slate-500">Encrypted URL share link</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Conversation Title</p>
+            <p className="text-xs font-semibold text-slate-800 truncate mt-0.5">{chatTitle || 'Clinical Consultation'}</p>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-semibold text-slate-700 block mb-1.5">
+              Encrypted Shareable URL
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={shareUrl}
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-700 outline-none select-all"
+              />
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-teal-700 px-3.5 py-2 text-xs font-medium text-white hover:bg-teal-800 transition shadow-xs"
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                <span>{copied ? 'Copied!' : 'Copy'}</span>
+              </button>
+            </div>
+          </div>
+
+          {copied && (
+            <p className="text-[11px] font-medium text-emerald-700 flex items-center gap-1">
+              <Check className="h-3 w-3" /> Share link copied to clipboard! Anyone with this link can view this consultation.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+          >
+            Done
+          </button>
         </div>
       </div>
     </div>
@@ -555,9 +680,16 @@ export default function ChatPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [conversationId, setConversationId] = useState(null)
 
+  // Stored chat history list & sidebar
+  const [conversations, setConversations] = useState([])
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true)
+  const [editingConvId, setEditingConvId] = useState(null)
+  const [editTitleText, setEditTitleText] = useState('')
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+
   // Model Selection: default Gemini 3.8 Flash, or PHA 0.1.1
   const [selectedModel, setSelectedModel] = useState(() => {
-    return localStorage.getItem('pha_selected_model') || 'gemini-3.8-flash'
+    return localStorage.getItem('pha_selected_model') || 'pha-0.1.1'
   })
   const [usage, setUsage] = useState(null)
 
@@ -612,6 +744,77 @@ export default function ChatPage() {
     }
   }, [])
 
+  // Select a conversation from history
+  const handleSelectConversation = (conv) => {
+    if (!conv) return
+    setConversationId(conv.conversation_id)
+    setMessages(Array.isArray(conv.messages) ? conv.messages : [])
+    const code = conv.chat_code || encodeChatCode(conv.conversation_id)
+    window.history.replaceState(null, '', '/chat?c=' + encodeURIComponent(code))
+  }
+
+  // Start a fresh new chat
+  const handleStartNewChat = () => {
+    setConversationId(null)
+    setMessages([])
+    setInput('')
+    setAttachedImage(null)
+    window.history.replaceState(null, '', '/chat')
+  }
+
+  // Start inline rename of chat title
+  const handleStartRename = (conv, e) => {
+    e.stopPropagation()
+    setEditingConvId(conv.conversation_id)
+    setEditTitleText(conv.title || 'Untitled Chat')
+  }
+
+  // Save renamed title
+  const handleSaveRename = async (convId, e) => {
+    if (e) e.stopPropagation()
+    const trimmed = editTitleText.trim()
+    if (!trimmed) {
+      setEditingConvId(null)
+      return
+    }
+
+    try {
+      await api.patch(`/api/chat/history/${encodeURIComponent(convId)}`, {
+        title: trimmed,
+      })
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.conversation_id === convId ? { ...c, title: trimmed } : c,
+        ),
+      )
+    } catch (err) {
+      console.error('Failed to rename conversation:', err)
+    } finally {
+      setEditingConvId(null)
+    }
+  }
+
+  // Delete a specific conversation from history
+  const handleDeleteConversation = async (convId, e) => {
+    if (e) e.stopPropagation()
+    try {
+      await api.delete(`/api/chat/history/${encodeURIComponent(convId)}`)
+      setConversations((prev) => {
+        const next = prev.filter((c) => c.conversation_id !== convId)
+        if (conversationId === convId) {
+          if (next.length > 0) {
+            handleSelectConversation(next[0])
+          } else {
+            handleStartNewChat()
+          }
+        }
+        return next
+      })
+    } catch (err) {
+      console.error('Failed to delete conversation:', err)
+    }
+  }
+
   // Restore history & initial usage
   useEffect(() => {
     let cancelled = false
@@ -624,22 +827,61 @@ export default function ChatPage() {
         const response = await api.get('/api/chat/history')
         if (cancelled) return
 
-        const conversations = Array.isArray(response.data?.conversations)
+        const loadedConvs = Array.isArray(response.data?.conversations)
           ? response.data.conversations
           : []
 
-        const latest = [...conversations]
-          .filter((item) => item && item.conversation_id)
-          .sort((a, b) => {
+        setConversations(loadedConvs)
+
+        // Check URL for ?c= or ?share=
+        const urlParams = new URLSearchParams(window.location.search)
+        const codeParam = urlParams.get('c') || urlParams.get('share')
+        let targetConv = null
+
+        if (codeParam) {
+          const decodedId = decodeChatCode(codeParam)
+          targetConv = loadedConvs.find(
+            (c) =>
+              c.conversation_id === decodedId ||
+              c.chat_code === codeParam ||
+              c.conversation_id === codeParam,
+          )
+
+          if (!targetConv) {
+            try {
+              const shareRes = await api.get(
+                `/api/chat/share/${encodeURIComponent(codeParam)}`,
+              )
+              if (shareRes.data?.conversation) {
+                targetConv = shareRes.data.conversation
+              }
+            } catch (shareErr) {
+              console.debug('Could not load shared link directly:', shareErr)
+            }
+          }
+        }
+
+        if (!targetConv && loadedConvs.length > 0) {
+          const sorted = [...loadedConvs].sort((a, b) => {
             const aTime = new Date(a.updated_at || a.created_at || 0).getTime()
             const bTime = new Date(b.updated_at || b.created_at || 0).getTime()
-            return aTime - bTime
+            return bTime - aTime
           })
-          .at(-1)
+          targetConv = sorted[0]
+        }
 
-        if (latest) {
-          setConversationId(latest.conversation_id)
-          setMessages(Array.isArray(latest.messages) ? latest.messages : [])
+        if (targetConv) {
+          setConversationId(targetConv.conversation_id)
+          setMessages(
+            Array.isArray(targetConv.messages) ? targetConv.messages : [],
+          )
+          const code =
+            targetConv.chat_code || encodeChatCode(targetConv.conversation_id)
+          window.history.replaceState(
+            null,
+            '',
+            '/chat?c=' + encodeURIComponent(code),
+          )
         } else {
           setConversationId(null)
           setMessages([])
@@ -853,7 +1095,20 @@ export default function ChatPage() {
       )
 
       const nextConversationId = response.data?.conversation_id
-      if (nextConversationId) setConversationId(nextConversationId)
+      const chatCode =
+        response.data?.chat_code ||
+        (nextConversationId ? encodeChatCode(nextConversationId) : '')
+
+      if (nextConversationId) {
+        setConversationId(nextConversationId)
+        if (chatCode) {
+          window.history.replaceState(
+            null,
+            '',
+            '/chat?c=' + encodeURIComponent(chatCode),
+          )
+        }
+      }
 
       if (response.data?.usage) {
         setUsage(response.data.usage)
@@ -868,11 +1123,46 @@ export default function ChatPage() {
           ? response.data.sources
           : [],
         safety_notice: response.data?.safety_notice || '',
-        model: response.data?.model || (selectedModel === 'pha-0.1.1' ? 'PHA 0.1.1' : 'Gemini 3.8 Flash'),
+        model:
+          response.data?.model ||
+          (selectedModel === 'pha-0.1.1' ? 'PHA 0.1.1' : 'Gemini 3.8 Flash'),
         created_at: formatTime(),
       }
 
       setMessages((current) => [...current, assistantMsg])
+
+      // Keep conversations sidebar in sync
+      setConversations((prev) => {
+        const title = questionText.slice(0, 48) || 'Clinical Consultation'
+        const existingIdx = prev.findIndex(
+          (c) => c.conversation_id === nextConversationId,
+        )
+        if (existingIdx >= 0) {
+          const updated = [...prev]
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            updated_at: formatTime(),
+            chat_code: chatCode,
+            messages: [
+              ...(updated[existingIdx].messages || []),
+              userMsg,
+              assistantMsg,
+            ],
+          }
+          return updated
+        } else {
+          return [
+            {
+              conversation_id: nextConversationId,
+              title,
+              chat_code: chatCode,
+              updated_at: formatTime(),
+              messages: [userMsg, assistantMsg],
+            },
+            ...prev,
+          ]
+        }
+      })
     } catch (error) {
       if (controller.signal.aborted) {
         return
@@ -936,46 +1226,231 @@ export default function ChatPage() {
     }
   }
 
+  const currentConversation = conversations.find(
+    (c) => c.conversation_id === conversationId,
+  )
+  const currentTitle =
+    currentConversation?.title ||
+    (messages.length > 0 ? 'Clinical Consultation' : 'New Consultation')
+  const currentChatCode =
+    currentConversation?.chat_code || encodeChatCode(conversationId)
+
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200/80 px-4 py-2.5 sm:px-5">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 overflow-hidden">
-            <img src="/logo.png" alt="PHA" className="h-7 w-7 object-contain" />
+    <div className="flex h-full w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs">
+      {/* Collapsible Left Chat History Sidebar */}
+      <aside
+        className={`transition-all duration-200 border-r border-slate-200 bg-slate-50/70 flex flex-col shrink-0 ${
+          isHistoryOpen ? 'w-60 sm:w-64' : 'w-0 border-r-0 overflow-hidden'
+        }`}
+      >
+        {/* History Header & + New Chat */}
+        <div className="p-3 border-b border-slate-200/80 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <MessageSquare className="h-3.5 w-3.5 text-teal-700" />
+              Chat History
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsHistoryOpen(false)}
+              className="rounded-lg p-1 text-slate-400 hover:bg-slate-200/60 transition"
+              title="Close history"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                Clinical Health Assistant
-              </span>
-              {usage && (
-                <span className="inline-flex items-center rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-800 border border-teal-100">
-                  {usage.used}/{usage.limit || 20} used
-                </span>
-              )}
-            </div>
-            <h2 className="text-xs sm:text-sm font-bold text-slate-800">
-              {selectedModel === 'pha-0.1.1'
-                ? 'PHA 0.1.1 Clinical Engine'
-                : 'Gemini 3.8 Flash Multimodal'}
-            </h2>
-          </div>
+
+          <button
+            type="button"
+            onClick={handleStartNewChat}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800 shadow-xs transition"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Chat</span>
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={resetThread}
-          disabled={loading || resetting || historyLoading}
-          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:border-red-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
-          title="Reset conversation"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">
-            {resetting ? 'Resetting…' : 'Reset Chat'}
-          </span>
-        </button>
-      </div>
+        {/* History Conversations List */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {historyLoading ? (
+            <div className="p-4 text-center text-xs text-slate-400">
+              <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-teal-700/20 border-t-teal-700" />
+              Loading history…
+            </div>
+          ) : conversations.length === 0 ? (
+            <p className="p-4 text-center text-xs text-slate-400">
+              No previous chats yet.
+            </p>
+          ) : (
+            conversations.map((conv) => {
+              const isActive = conv.conversation_id === conversationId
+              const isEditing = editingConvId === conv.conversation_id
+
+              return (
+                <div
+                  key={conv.conversation_id}
+                  onClick={() => !isEditing && handleSelectConversation(conv)}
+                  className={`group flex items-center justify-between rounded-xl px-2.5 py-2 text-xs transition cursor-pointer ${
+                    isActive
+                      ? 'bg-teal-50 text-teal-900 font-semibold ring-1 ring-teal-200 shadow-2xs'
+                      : 'text-slate-700 hover:bg-slate-200/50'
+                  }`}
+                >
+                  {isEditing ? (
+                    <div
+                      className="flex items-center gap-1 w-full"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        value={editTitleText}
+                        onChange={(e) => setEditTitleText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter')
+                            handleSaveRename(conv.conversation_id, e)
+                          if (e.key === 'Escape') setEditingConvId(null)
+                        }}
+                        autoFocus
+                        className="flex-1 rounded-lg border border-teal-400 bg-white px-2 py-1 text-xs outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => handleSaveRename(conv.conversation_id, e)}
+                        className="rounded-md p-1 text-teal-700 hover:bg-teal-100"
+                        title="Save title"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingConvId(null)}
+                        className="rounded-md p-1 text-slate-400 hover:bg-slate-200"
+                        title="Cancel"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 truncate">
+                        <MessageSquare className="h-3.5 w-3.5 shrink-0 text-teal-600" />
+                        <span className="truncate">{conv.title || 'Consultation'}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={(e) => handleStartRename(conv, e)}
+                          className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                          title="Edit chat name"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) =>
+                            handleDeleteConversation(conv.conversation_id, e)
+                          }
+                          className="rounded-md p-1 text-slate-400 hover:bg-rose-100 hover:text-rose-600"
+                          title="Delete chat"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      </aside>
+
+      {/* Main Conversation Container */}
+      <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-200/80 px-3 py-2.5 sm:px-4">
+          <div className="flex items-center gap-2 truncate">
+            {!isHistoryOpen && (
+              <button
+                type="button"
+                onClick={() => setIsHistoryOpen(true)}
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
+                title="Open chat history"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </button>
+            )}
+
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 overflow-hidden">
+              <img src="/logo.png" alt="PHA" className="h-7 w-7 object-contain" />
+            </div>
+
+            <div className="truncate">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Clinical Assistant
+                </span>
+
+                {selectedModel === 'pha-0.1.1' ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    PHA ∞ Unlimited
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-800 border border-teal-100">
+                    {usage ? `${usage.used || 0}/${usage.limit || 20} used` : 'Daily Quota'}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 truncate">
+                <h2 className="text-xs sm:text-sm font-bold text-slate-800 truncate">
+                  {currentTitle}
+                </h2>
+                {conversationId && (
+                  <button
+                    type="button"
+                    onClick={(e) =>
+                      currentConversation &&
+                      handleStartRename(currentConversation, e)
+                    }
+                    className="text-slate-400 hover:text-slate-600 transition p-0.5"
+                    title="Rename chat"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Share Chat Button */}
+            {conversationId && messages.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsShareModalOpen(true)}
+                className="inline-flex items-center gap-1 rounded-xl border border-teal-200 bg-teal-50/70 px-2.5 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
+                title="Share this chat via encrypted URL"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Share</span>
+              </button>
+            )}
+
+            {/* New Chat Button */}
+            <button
+              type="button"
+              onClick={handleStartNewChat}
+              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 transition shadow-2xs"
+              title="Start a new consultation"
+            >
+              <Plus className="h-3.5 w-3.5 text-teal-700" />
+              <span className="hidden sm:inline">New Chat</span>
+            </button>
+          </div>
+        </div>
 
       {errorMessage && (
         <div
@@ -1268,13 +1743,23 @@ export default function ChatPage() {
           </span>
         </div>
       </div>
-
-      {/* Camera Capture Modal */}
-      <CameraCaptureModal
-        isOpen={isCameraModalOpen}
-        onClose={() => setIsCameraModalOpen(false)}
-        onCapture={handleCameraCapture}
-      />
     </div>
-  )
+
+    {/* Camera Capture Modal */}
+    <CameraCaptureModal
+      isOpen={isCameraModalOpen}
+      onClose={() => setIsCameraModalOpen(false)}
+      onCapture={handleCameraCapture}
+    />
+
+    {/* Share Conversation Modal */}
+    <ShareModal
+      isOpen={isShareModalOpen}
+      onClose={() => setIsShareModalOpen(false)}
+      conversationId={conversationId}
+      chatTitle={currentTitle}
+      chatCode={currentChatCode}
+    />
+  </div>
+)
 }

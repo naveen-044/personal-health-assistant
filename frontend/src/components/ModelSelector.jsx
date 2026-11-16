@@ -12,18 +12,18 @@ import {
 
 export const MODEL_OPTIONS = [
   {
-    id: 'gemini-3.8-flash',
-    name: 'Gemini 3.8 Flash',
-    tag: 'Default',
-    icon: Sparkles,
-    description: 'High-speed multimodal AI for medicine analysis & prescription decoding.',
-  },
-  {
     id: 'pha-0.1.1',
     name: 'PHA 0.1.1',
-    tag: 'Clinical',
+    tag: 'Unlimited',
     icon: Stethoscope,
-    description: 'Personal Health Assistant Clinical Diagnostic System with evidence tables & multi-source retrieval.',
+    description: 'Personal Health Assistant Clinical Intelligence System. Unlimited generations, evidence tables & prescription transcription.',
+  },
+  {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    tag: '20/Day',
+    icon: Sparkles,
+    description: 'High-speed multimodal AI for medicine analysis & general clinical queries.',
   },
 ]
 
@@ -72,10 +72,21 @@ export const UsageModal = memo(function UsageModal({
           </button>
         </div>
 
-        {/* Daily limit progress bar */}
-        <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3.5 space-y-2.5">
+        {/* PHA 0.1.1 Unlimited Banner */}
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-[11px] leading-relaxed text-emerald-950">
+          <div className="flex items-center gap-1.5 font-bold text-emerald-900 mb-1">
+            <Stethoscope className="h-4 w-4 text-emerald-700" />
+            <span>PHA 0.1.1 Clinical Model: Unlimited</span>
+          </div>
+          <p className="text-emerald-800">
+            Enjoy <strong>unlimited free generations</strong> with zero daily limits when using the <strong>PHA 0.1.1</strong> Clinical Intelligence Engine.
+          </p>
+        </div>
+
+        {/* Gemini Daily limit progress bar */}
+        <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3.5 space-y-2.5">
           <div className="flex items-center justify-between text-xs font-semibold">
-            <span className="text-slate-600">Daily Generations</span>
+            <span className="text-slate-600">Gemini 3.8 Flash Quota</span>
             <span className="text-teal-800">
               {used} / {limit} today
             </span>

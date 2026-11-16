@@ -118,3 +118,10 @@ class RouteTests(unittest.TestCase):
     def test_client_supplied_user_id_does_not_authenticate(self) -> None:
         response = self.client.get('/api/chat/history', headers={'X-User-Id': 'somebody-else'})
         self.assertEqual(response.status_code, 401)
+
+    def test_rename_and_share_routes_require_authentication(self) -> None:
+        res1 = self.client.patch('/api/chat/history/test-conv', json={'title': 'New Name'})
+        self.assertEqual(res1.status_code, 401)
+
+        res2 = self.client.post('/api/chat/share', json={'conversation_id': 'test-conv'})
+        self.assertEqual(res2.status_code, 401)
