@@ -52,15 +52,25 @@ class GeminiServiceTests(unittest.TestCase):
         self.assertTrue(result['model'].startswith('gemini'))
 
     @patch('httpx.Client')
-    def test_call_gemini_api_quota_error(self, mock_client_cls):
+    def test_call_gemini_api_pha_system_prompt(self, mock_client_cls):
         mock_resp = MagicMock()
-        mock_resp.status_code = 429
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            'candidates': [
+                {
+                    'content': {
+                        'parts': [{'text': '### PHA 0.1.1 Clinical Transcription'}]
+                    }
+                }
+            ]
+        }
         mock_client = MagicMock()
         mock_client.post.return_value = mock_resp
         mock_client_cls.return_value.__enter__.return_value = mock_client
 
-        with self.assertRaises(GeminiQuotaError):
-            call_gemini_api(
-                prompt="What is aspirin?",
-                api_key="test-gemini-key",
-            )
+        result = call_gemini_api(
+            prompt="Transcribe prescription",
+            api_key="test-gemini-key",
+            system_prompt_type='pha',
+        )
+        self.assertIn("PHA 0.1.1 Clinical Transcription", result['answer'])

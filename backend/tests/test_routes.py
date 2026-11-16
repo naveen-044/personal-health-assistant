@@ -94,6 +94,9 @@ class RouteTests(unittest.TestCase):
         res3 = self.client.get('/api/chat/usage')
         self.assertEqual(res3.status_code, 401)
 
+        res4 = self.client.post('/api/chat/feedback', json={})
+        self.assertEqual(res4.status_code, 401)
+
     def test_delete_history_requires_authentication(self) -> None:
         res = self.client.delete('/api/chat/history/non-existent-id')
         self.assertEqual(res.status_code, 401)

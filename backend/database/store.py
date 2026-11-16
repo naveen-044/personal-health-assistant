@@ -17,6 +17,7 @@ class InMemoryStore:
         self.conversations = {}
         self.documents = {}
         self.daily_usage = {}
+        self.feedback = []
 
     def get_or_create_profile(self, user_id: str) -> dict[str, Any]:
         with self._lock:
@@ -127,6 +128,27 @@ class InMemoryStore:
             'date': today,
         }
 
+    def save_feedback(
+        self,
+        user_id: str,
+        conversation_id: str,
+        message_index: int,
+        rating: str,
+        feedback_text: str | None = None,
+    ) -> dict[str, Any]:
+        with self._lock:
+            record = {
+                'id': str(uuid.uuid4()),
+                'user_id': user_id,
+                'conversation_id': conversation_id,
+                'message_index': message_index,
+                'rating': rating,
+                'feedback_text': feedback_text or '',
+                'created_at': datetime.now(timezone.utc).strftime('%d-%m-%Y %I:%M %p'),
+            }
+            self.feedback.append(record)
+            return deepcopy(record)
+
     def delete_conversation(self, user_id: str, conversation_id: str) -> bool:
         with self._lock:
             conversations = self.conversations.get(user_id, [])
@@ -194,6 +216,10 @@ class MongoStore:
             self.daily_usage.create_index([('user_id', 1), ('service', 1), ('date', 1)], unique=True, name='daily_usage_user_service_date')
         except Exception:
             self.daily_usage = None
+        try:
+            self.feedback = self.db['chat_feedback']
+        except Exception:
+            self.feedback = None
         self.auth_users.create_index('email', unique=True, name='users_email_unique')
         self.auth_sessions.create_index('token_hash', unique=True, name='auth_sessions_token_hash_unique')
         self.auth_sessions.create_index('expires_at', expireAfterSeconds=0, name='auth_sessions_expiry')
@@ -414,6 +440,29 @@ class MongoStore:
             'remaining': max(0, limit - count),
             'date': today,
         }
+
+    def save_feedback(
+        self,
+        user_id: str,
+        conversation_id: str,
+        message_index: int,
+        rating: str,
+        feedback_text: str | None = None,
+    ) -> dict[str, Any]:
+        record = {
+            'user_id': user_id,
+            'conversation_id': conversation_id,
+            'message_index': message_index,
+            'rating': rating,
+            'feedback_text': feedback_text or '',
+            'created_at': datetime.now(timezone.utc).strftime('%d-%m-%Y %I:%M %p'),
+        }
+        if self.feedback is not None:
+            try:
+                self.feedback.insert_one(deepcopy(record))
+            except Exception as exc:
+                logger.warning('Feedback insert error: %s', exc)
+        return record
 
     def delete_conversation(self, user_id: str, conversation_id: str) -> bool:
         result = self.conversations.delete_one({'user_id': user_id, 'conversation_id': conversation_id})

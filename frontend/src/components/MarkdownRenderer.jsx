@@ -60,7 +60,7 @@ export const InlineMarkdownParser = memo(function InlineMarkdownParser({ text })
   )
 })
 
-// Styled Snippet Box for code, prescriptions, and structured dosage summaries
+// Styled Snippet Box: White for text/prescriptions, Highlight color code for programs
 export const SnippetBox = memo(function SnippetBox({ title, content }) {
   const [copied, setCopied] = useState(false)
 
@@ -71,35 +71,76 @@ export const SnippetBox = memo(function SnippetBox({ title, content }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const normalizedTitle = (title || 'Clinical Snippet').trim().toUpperCase()
+  const lang = (title || '').toLowerCase().trim()
+  const isProgramCode = [
+    'json',
+    'python',
+    'py',
+    'javascript',
+    'js',
+    'typescript',
+    'ts',
+    'bash',
+    'sh',
+    'sql',
+    'html',
+    'css',
+    'code',
+  ].includes(lang)
+
+  const displayTitle = (
+    title || (isProgramCode ? 'Code' : 'Clinical Prescription / Notes')
+  )
+    .trim()
+    .toUpperCase()
 
   return (
-    <div className="my-3 overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900 text-slate-100 shadow-md">
-      <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/90 px-3.5 py-2 text-xs">
-        <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold tracking-wider text-teal-400">
-          <FileText className="h-3.5 w-3.5 text-teal-400" />
-          <span>{normalizedTitle}</span>
+    <div
+      className={`my-3 overflow-hidden rounded-xl border shadow-xs ${
+        isProgramCode
+          ? 'border-slate-800 bg-slate-900 text-teal-300'
+          : 'border-slate-200 bg-white text-slate-800 ring-1 ring-slate-100'
+      }`}
+    >
+      <div
+        className={`flex items-center justify-between border-b px-3.5 py-2 text-xs ${
+          isProgramCode
+            ? 'border-slate-800 bg-slate-950/90 text-teal-400'
+            : 'border-slate-100 bg-slate-50/90 text-teal-800'
+        }`}
+      >
+        <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold tracking-wider">
+          <FileText className="h-3.5 w-3.5 shrink-0" />
+          <span>{displayTitle}</span>
         </div>
         <button
           type="button"
           onClick={handleCopy}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-800/80 px-2.5 py-1 text-[11px] font-medium text-slate-300 transition hover:bg-slate-700 hover:text-white"
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition ${
+            isProgramCode
+              ? 'border-slate-700 bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white'
+              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+          }`}
           title="Copy snippet to clipboard"
         >
           {copied ? (
             <>
-              <Check className="h-3 w-3 text-emerald-400" />
-              <span className="text-emerald-400">Copied</span>
+              <Check className="h-3 w-3 text-emerald-500" />
+              <span className="text-emerald-600 font-semibold">Copied</span>
             </>
           ) : (
             <>
-              <Copy className="h-3 w-3 text-slate-400" />
+              <Copy className="h-3 w-3 opacity-70" />
               <span>Copy</span>
             </>
           )}
         </button>
       </div>
-      <pre className="overflow-x-auto p-3.5 font-mono text-xs leading-relaxed text-slate-200 whitespace-pre-wrap select-text [-webkit-overflow-scrolling:touch]">
+      <pre
+        className={`overflow-x-auto p-3.5 font-mono text-xs leading-relaxed whitespace-pre-wrap select-text [-webkit-overflow-scrolling:touch] ${
+          isProgramCode ? 'text-slate-200' : 'text-slate-800 bg-white'
+        }`}
+      >
         {content}
       </pre>
     </div>

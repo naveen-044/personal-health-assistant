@@ -33,6 +33,36 @@ def get_chat_usage(user: dict = Depends(get_current_user)) -> dict[str, Any]:
     return usage
 
 
+@router.post('/api/chat/feedback')
+@router.post('/chat/feedback')
+async def submit_feedback(request: Request, user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    body = await request.body()
+    data = {}
+    if body:
+        try:
+            data = json.loads(body.decode('utf-8'))
+        except Exception:
+            try:
+                data = json.loads(body)
+            except Exception:
+                data = {}
+
+    conversation_id = str(data.get('conversation_id') or '')
+    message_index = int(data.get('message_index', 0))
+    rating = str(data.get('rating') or 'thumbs_down')
+    feedback_text = str(data.get('feedback_text') or '').strip()
+
+    user_id = user['user_id']
+    record = store.save_feedback(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_index=message_index,
+        rating=rating,
+        feedback_text=feedback_text,
+    )
+    return {'status': 'success', 'message': 'Feedback recorded successfully.', 'feedback': record}
+
+
 @router.post('/api/chat', response_model=ChatResponse)
 @router.post('/chat', response_model=ChatResponse)
 async def answer_question(request: Request, user: dict = Depends(get_current_user)) -> dict[str, Any]:
@@ -82,15 +112,16 @@ async def answer_question(request: Request, user: dict = Depends(get_current_use
     profile = store.get_or_create_profile(user_id)
     conversation_id = payload.conversation_id or str(uuid.uuid4())
 
-    is_gemini_selected = 'gemini' in selected_model or bool(image_data)
+    is_pha_selected = 'pha' in selected_model
+    is_gemini_or_pha = is_pha_selected or 'gemini' in selected_model or bool(image_data)
 
-    if is_gemini_selected:
-        # Check daily usage limit for Gemini
+    if is_gemini_or_pha:
+        # Check daily usage limit
         usage = store.get_daily_usage(user_id, service='gemini', limit=settings.GEMINI_DAILY_LIMIT)
         if not custom_api_key and usage['used'] >= settings.GEMINI_DAILY_LIMIT:
             raise HTTPException(
                 status_code=429,
-                detail=f"Daily limit of {settings.GEMINI_DAILY_LIMIT} Gemini requests reached for today. Resets daily at 00:00 UTC. Switch to the default knowledge base model or provide your own API key in View Usage.",
+                detail=f"Daily limit of {settings.GEMINI_DAILY_LIMIT} generations reached for today. Resets daily at 00:00 UTC.",
             )
 
         # Retrieve grounding context from indexed medical library if available
@@ -112,6 +143,7 @@ async def answer_question(request: Request, user: dict = Depends(get_current_use
                 api_key=custom_api_key or None,
                 context_text=context_text,
                 user_profile=profile,
+                system_prompt_type='pha' if is_pha_selected else 'gemini',
             )
         except GeminiConfigError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -120,8 +152,8 @@ async def answer_question(request: Request, user: dict = Depends(get_current_use
         except GeminiError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         except Exception as exc:
-            logger.error("Unexpected error in Gemini processing: %s", exc)
-            raise HTTPException(status_code=500, detail="Failed to process request with Gemini.") from exc
+            logger.error("Unexpected error in processing: %s", exc)
+            raise HTTPException(status_code=500, detail="Failed to process request.") from exc
 
         sources = [
             {
@@ -139,6 +171,8 @@ async def answer_question(request: Request, user: dict = Depends(get_current_use
         if not custom_api_key:
             updated_usage = store.increment_daily_usage(user_id, service='gemini', limit=settings.GEMINI_DAILY_LIMIT)
 
+        active_model_name = 'PHA 0.1.1' if is_pha_selected else 'Gemini 3.8 Flash'
+
         store.append_turn(
             user_id,
             conversation_id,
@@ -153,7 +187,7 @@ async def answer_question(request: Request, user: dict = Depends(get_current_use
             'answer': gemini_res['answer'],
             'sources': sources,
             'safety_notice': 'This chatbot provides general educational health information and prescription transcription and is not a diagnosis or replacement for a clinician.',
-            'model': 'Gemini 3.8 Flash',
+            'model': active_model_name,
             'usage': updated_usage,
         }
 
