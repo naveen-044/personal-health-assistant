@@ -8,13 +8,11 @@ export default function AuthLayout({ children }) {
         <aside className="relative hidden overflow-hidden bg-gradient-to-br from-sky-800 via-teal-700 to-emerald-700 px-12 py-10 text-white lg:flex lg:flex-col lg:justify-between">
           <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border border-white/10" />
           <div className="absolute -bottom-40 -left-36 h-[30rem] w-[30rem] rounded-full border border-white/10" />
-          <Link to="/" className="relative inline-flex w-fit items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25">
-              <HeartPulse className="h-7 w-7" />
-            </span>
+          <Link to="/" className="relative inline-flex w-fit items-center gap-3.5">
+            <img src="/logo.png" alt="PHA Logo" className="h-12 w-12 rounded-2xl bg-white p-0.5 object-contain shadow-md ring-1 ring-white/30" />
             <span>
-              <span className="block text-lg font-semibold">Personal Health</span>
-              <span className="block text-sm text-teal-100">Assistant</span>
+              <span className="block text-lg font-bold tracking-tight">Personal Health</span>
+              <span className="block text-xs font-medium tracking-wide text-teal-100">Assistant (PHA)</span>
             </span>
           </Link>
 
@@ -41,10 +39,8 @@ export default function AuthLayout({ children }) {
 
         <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
           <div className="w-full max-w-md">
-            <Link to="/" className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-slate-700 lg:hidden">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
-                <HeartPulse className="h-5 w-5" />
-              </span>
+            <Link to="/" className="mb-8 inline-flex items-center gap-2.5 text-base font-bold text-slate-800 lg:hidden">
+              <img src="/logo.png" alt="PHA Logo" className="h-9 w-9 rounded-xl object-contain shadow-2xs" />
               Personal Health Assistant
             </Link>
             {children}

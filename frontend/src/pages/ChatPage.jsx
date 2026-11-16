@@ -1,6 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Bot,
   FileText,
   SendHorizontal,
   ShieldAlert,
@@ -198,8 +197,8 @@ const ChatMessageItem = memo(function ChatMessageItem({ message }) {
       }`}
     >
       {!isUser && (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700 shadow-xs">
-          <Bot className="h-4 w-4" />
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 shadow-xs overflow-hidden">
+          <img src="/logo.png" alt="PHA" className="h-6 w-6 object-contain" />
         </div>
       )}
 
@@ -463,8 +462,8 @@ export default function ChatPage() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 md:px-5 md:py-4">
         <div className="flex items-center gap-2.5">
-          <div className="rounded-xl bg-brand-50 p-2 text-brand-700 shadow-xs">
-            <Bot className="h-5 w-5" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 shadow-xs overflow-hidden">
+            <img src="/logo.png" alt="PHA" className="h-8 w-8 object-contain" />
           </div>
           <div>
             <p className="text-[11px] font-medium text-slate-500">
@@ -531,8 +530,8 @@ export default function ChatPage() {
 
         {loading && (
           <div className="flex items-end justify-start gap-2.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700 shadow-xs">
-              <Bot className="h-4 w-4" />
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 shadow-xs overflow-hidden">
+              <img src="/logo.png" alt="PHA" className="h-6 w-6 object-contain" />
             </div>
             <div className="rounded-2xl rounded-bl-xs border border-slate-200/80 bg-slate-50/80 px-4 py-3 shadow-xs">
               <div className="flex items-center gap-2.5">

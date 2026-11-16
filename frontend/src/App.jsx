@@ -77,9 +77,12 @@ function AppShell() {
     <div className="min-h-screen bg-slate-100 text-slate-800">
       <div className="mx-auto flex max-w-7xl gap-4 p-3 sm:gap-6 sm:p-4 md:p-6">
         <aside className="hidden w-72 shrink-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-soft md:block">
-          <Link to="/" className="mb-6 block px-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Personal Health</p>
-            <h1 className="mt-2 text-2xl font-bold text-slate-900">Assistant</h1>
+          <Link to="/" className="mb-6 flex items-center gap-3 px-2">
+            <img src="/logo.png" alt="PHA Logo" className="h-11 w-11 shrink-0 rounded-xl object-contain shadow-xs" />
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-700">Personal Health</p>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">Assistant</h1>
+            </div>
           </Link>
           <nav className="space-y-2" aria-label="Main navigation">
             {navItems.map(({ to, label, icon: Icon }) => (
@@ -105,7 +108,10 @@ function AppShell() {
         <main className="min-w-0 flex-1">
           <header className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-soft md:hidden">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <Link to="/" className="text-sm font-bold text-slate-900">Personal Health Assistant</Link>
+              <Link to="/" className="flex items-center gap-2">
+                <img src="/logo.png" alt="PHA Logo" className="h-7 w-7 shrink-0 rounded-lg object-contain shadow-2xs" />
+                <span className="text-sm font-bold text-slate-900">Personal Health Assistant</span>
+              </Link>
               <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
                 <LogOut className="h-3.5 w-3.5" /> Sign out
               </button>
