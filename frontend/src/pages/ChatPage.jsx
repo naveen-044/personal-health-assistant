@@ -15,22 +15,28 @@ import { FormattedMessage } from '../components/MarkdownRenderer'
 import { ModelSelector } from '../components/ModelSelector'
 
 function formatTime(value) {
-  if (!value) {
-    return new Date().toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+  let date
+  if (!value || value === 'just now') {
+    date = new Date()
+  } else if (typeof value === 'string' && /^\d{2}-\d{2}-\d{4}/.test(value)) {
+    return value
+  } else {
+    date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      date = new Date()
+    }
   }
 
-  if (typeof value === 'string' && /am|pm/i.test(value)) return value
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-
-  return date.toLocaleTimeString([], {
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  const time = date.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
+    hour12: true,
   })
+
+  return `${day}-${month}-${year}, ${time}`
 }
 
 function getApiErrorMessage(error, fallback) {

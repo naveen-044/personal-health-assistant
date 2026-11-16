@@ -85,6 +85,17 @@ export const UsageModal = memo(function UsageModal({
   const remaining = usage?.remaining !== undefined ? usage.remaining : Math.max(0, limit - used)
   const percent = Math.min(100, Math.round((used / limit) * 100))
 
+  const formattedDate = (() => {
+    if (usage?.date && /^\d{2}-\d{2}-\d{4}$/.test(usage.date)) {
+      return usage.date
+    }
+    const d = new Date()
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const year = d.getFullYear()
+    return `${day}-${month}-${year}`
+  })()
+
   const handleSave = () => {
     onSaveApiKey(apiKeyInput.trim())
     setSavedSuccess(true)
@@ -136,7 +147,7 @@ export const UsageModal = memo(function UsageModal({
           </div>
 
           <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-            <span>{remaining} generations remaining</span>
+            <span>{remaining} generations remaining ({formattedDate})</span>
             <span>Resets daily at 00:00 UTC</span>
           </div>
         </div>
