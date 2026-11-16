@@ -32,6 +32,7 @@ import {
 import api from '../services/api'
 import { FormattedMessage } from '../components/MarkdownRenderer'
 import { ModelSelector } from '../components/ModelSelector'
+import { useChat, encodeChatCode } from '../context/ChatContext'
 
 // Downscale high-resolution images to prevent upload failures and payload timeouts
 function downscaleImage(file, maxDimension = 1600, quality = 0.85) {
@@ -216,33 +217,7 @@ function CameraCaptureModal({ isOpen, onClose, onCapture }) {
   )
 }
 
-// Encrypted / Encoded Chat Code helpers
-export function encodeChatCode(conversationId) {
-  if (!conversationId) return ''
-  try {
-    return (
-      'pha_' +
-      btoa(conversationId)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '')
-    )
-  } catch (e) {
-    return 'pha_' + conversationId
-  }
-}
-
-export function decodeChatCode(code) {
-  if (!code) return ''
-  let cleaned = code.startsWith('pha_') ? code.slice(4) : code
-  cleaned = cleaned.replace(/-/g, '+').replace(/_/g, '/')
-  while (cleaned.length % 4) cleaned += '='
-  try {
-    return atob(cleaned)
-  } catch (e) {
-    return cleaned
-  }
-}
+// Encrypted / Encoded Chat Code helpers are imported from ../context/ChatContext
 
 // Share Modal for Encrypted Share Links
 function ShareModal({ isOpen, onClose, conversationId, chatTitle, chatCode }) {
@@ -672,22 +647,25 @@ const ChatMessageItem = memo(function ChatMessageItem({
 })
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState([])
+  const {
+    conversations,
+    activeConversationId,
+    setActiveConversationId,
+    messages,
+    setMessages,
+    updateActiveConversation,
+    startNewChat,
+    renameConversation,
+    setEditingConvId,
+    setEditTitleText,
+  } = useChat()
+
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [historyLoading, setHistoryLoading] = useState(true)
-  const [resetting, setResetting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-  const [conversationId, setConversationId] = useState(null)
-
-  // Stored chat history list & sidebar
-  const [conversations, setConversations] = useState([])
-  const [isHistoryOpen, setIsHistoryOpen] = useState(true)
-  const [editingConvId, setEditingConvId] = useState(null)
-  const [editTitleText, setEditTitleText] = useState('')
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
 
-  // Model Selection: default Gemini 3.8 Flash, or PHA 0.1.1
+  // Model Selection: default PHA 0.1.1
   const [selectedModel, setSelectedModel] = useState(() => {
     return localStorage.getItem('pha_selected_model') || 'pha-0.1.1'
   })
@@ -744,170 +722,14 @@ export default function ChatPage() {
     }
   }, [])
 
-  // Select a conversation from history
-  const handleSelectConversation = (conv) => {
-    if (!conv) return
-    setConversationId(conv.conversation_id)
-    setMessages(Array.isArray(conv.messages) ? conv.messages : [])
-    const code = conv.chat_code || encodeChatCode(conv.conversation_id)
-    window.history.replaceState(null, '', '/chat?c=' + encodeURIComponent(code))
-  }
-
-  // Start a fresh new chat
-  const handleStartNewChat = () => {
-    setConversationId(null)
-    setMessages([])
-    setInput('')
-    setAttachedImage(null)
-    window.history.replaceState(null, '', '/chat')
-  }
-
-  // Start inline rename of chat title
-  const handleStartRename = (conv, e) => {
-    e.stopPropagation()
-    setEditingConvId(conv.conversation_id)
-    setEditTitleText(conv.title || 'Untitled Chat')
-  }
-
-  // Save renamed title
-  const handleSaveRename = async (convId, e) => {
-    if (e) e.stopPropagation()
-    const trimmed = editTitleText.trim()
-    if (!trimmed) {
-      setEditingConvId(null)
-      return
-    }
-
-    try {
-      await api.patch(`/api/chat/history/${encodeURIComponent(convId)}`, {
-        title: trimmed,
-      })
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.conversation_id === convId ? { ...c, title: trimmed } : c,
-        ),
-      )
-    } catch (err) {
-      console.error('Failed to rename conversation:', err)
-    } finally {
-      setEditingConvId(null)
-    }
-  }
-
-  // Delete a specific conversation from history
-  const handleDeleteConversation = async (convId, e) => {
-    if (e) e.stopPropagation()
-    try {
-      await api.delete(`/api/chat/history/${encodeURIComponent(convId)}`)
-      setConversations((prev) => {
-        const next = prev.filter((c) => c.conversation_id !== convId)
-        if (conversationId === convId) {
-          if (next.length > 0) {
-            handleSelectConversation(next[0])
-          } else {
-            handleStartNewChat()
-          }
-        }
-        return next
-      })
-    } catch (err) {
-      console.error('Failed to delete conversation:', err)
-    }
-  }
-
-  // Restore history & initial usage
   useEffect(() => {
-    let cancelled = false
-
-    async function loadHistory() {
-      setHistoryLoading(true)
-      setErrorMessage('')
-
-      try {
-        const response = await api.get('/api/chat/history')
-        if (cancelled) return
-
-        const loadedConvs = Array.isArray(response.data?.conversations)
-          ? response.data.conversations
-          : []
-
-        setConversations(loadedConvs)
-
-        // Check URL for ?c= or ?share=
-        const urlParams = new URLSearchParams(window.location.search)
-        const codeParam = urlParams.get('c') || urlParams.get('share')
-        let targetConv = null
-
-        if (codeParam) {
-          const decodedId = decodeChatCode(codeParam)
-          targetConv = loadedConvs.find(
-            (c) =>
-              c.conversation_id === decodedId ||
-              c.chat_code === codeParam ||
-              c.conversation_id === codeParam,
-          )
-
-          if (!targetConv) {
-            try {
-              const shareRes = await api.get(
-                `/api/chat/share/${encodeURIComponent(codeParam)}`,
-              )
-              if (shareRes.data?.conversation) {
-                targetConv = shareRes.data.conversation
-              }
-            } catch (shareErr) {
-              console.debug('Could not load shared link directly:', shareErr)
-            }
-          }
-        }
-
-        if (!targetConv && loadedConvs.length > 0) {
-          const sorted = [...loadedConvs].sort((a, b) => {
-            const aTime = new Date(a.updated_at || a.created_at || 0).getTime()
-            const bTime = new Date(b.updated_at || b.created_at || 0).getTime()
-            return bTime - aTime
-          })
-          targetConv = sorted[0]
-        }
-
-        if (targetConv) {
-          setConversationId(targetConv.conversation_id)
-          setMessages(
-            Array.isArray(targetConv.messages) ? targetConv.messages : [],
-          )
-          const code =
-            targetConv.chat_code || encodeChatCode(targetConv.conversation_id)
-          window.history.replaceState(
-            null,
-            '',
-            '/chat?c=' + encodeURIComponent(code),
-          )
-        } else {
-          setConversationId(null)
-          setMessages([])
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('Error loading chat history:', error)
-          setErrorMessage(
-            getApiErrorMessage(
-              error,
-              'Could not load saved chat history. Check that the backend is running, then refresh the page.',
-            ),
-          )
-        }
-      } finally {
-        if (!cancelled) setHistoryLoading(false)
-      }
-    }
-
-    loadHistory()
     fetchUsage()
-
-    return () => {
-      cancelled = true
-    }
   }, [fetchUsage])
+
+  // Scroll on message change
+  useEffect(() => {
+    requestAnimationFrame(() => scrollToBottom(false))
+  }, [messages.length, loading, scrollToBottom])
 
   // Scroll on message change
   useEffect(() => {
@@ -1056,8 +878,7 @@ export default function ChatPage() {
     if (
       (!questionText && !imageData) ||
       requestInProgressRef.current ||
-      resetting ||
-      historyLoading
+      loadingHistory
     ) {
       return
     }
@@ -1087,28 +908,18 @@ export default function ChatPage() {
           question:
             questionText ||
             'Please analyze this medical image / doctor prescription in detail.',
-          conversation_id: conversationId,
+          conversation_id: activeConversationId,
           model: selectedModel,
           image: imageData,
         },
         { signal: controller.signal },
       )
 
-      const nextConversationId = response.data?.conversation_id
+      const nextConversationId =
+        response.data?.conversation_id || activeConversationId
       const chatCode =
         response.data?.chat_code ||
         (nextConversationId ? encodeChatCode(nextConversationId) : '')
-
-      if (nextConversationId) {
-        setConversationId(nextConversationId)
-        if (chatCode) {
-          window.history.replaceState(
-            null,
-            '',
-            '/chat?c=' + encodeURIComponent(chatCode),
-          )
-        }
-      }
 
       if (response.data?.usage) {
         setUsage(response.data.usage)
@@ -1129,40 +940,13 @@ export default function ChatPage() {
         created_at: formatTime(),
       }
 
-      setMessages((current) => [...current, assistantMsg])
-
-      // Keep conversations sidebar in sync
-      setConversations((prev) => {
-        const title = questionText.slice(0, 48) || 'Clinical Consultation'
-        const existingIdx = prev.findIndex(
-          (c) => c.conversation_id === nextConversationId,
-        )
-        if (existingIdx >= 0) {
-          const updated = [...prev]
-          updated[existingIdx] = {
-            ...updated[existingIdx],
-            updated_at: formatTime(),
-            chat_code: chatCode,
-            messages: [
-              ...(updated[existingIdx].messages || []),
-              userMsg,
-              assistantMsg,
-            ],
-          }
-          return updated
-        } else {
-          return [
-            {
-              conversation_id: nextConversationId,
-              title,
-              chat_code: chatCode,
-              updated_at: formatTime(),
-              messages: [userMsg, assistantMsg],
-            },
-            ...prev,
-          ]
-        }
-      })
+      updateActiveConversation(
+        nextConversationId,
+        userMsg,
+        assistantMsg,
+        questionText.slice(0, 48) || 'Clinical Consultation',
+        chatCode,
+      )
     } catch (error) {
       if (controller.signal.aborted) {
         return
@@ -1189,273 +973,94 @@ export default function ChatPage() {
     }
   }
 
-  // Reset thread
-  const resetThread = async () => {
-    if (loading || resetting || historyLoading) return
-
-    setErrorMessage('')
-    setResetting(true)
-
-    try {
-      if (conversationId) {
-        try {
-          await api.delete(
-            `/api/chat/history/${encodeURIComponent(conversationId)}`,
-          )
-        } catch (delErr) {
-          if (delErr.response?.status !== 404) {
-            throw delErr
-          }
-        }
-      }
-
-      setMessages([])
-      setConversationId(null)
-      setInput('')
-      setAttachedImage(null)
-    } catch (error) {
-      console.error('Error resetting chat:', error)
-      setErrorMessage(
-        getApiErrorMessage(
-          error,
-          'The chat could not be deleted from saved history. Please try again.',
-        ),
-      )
-    } finally {
-      setResetting(false)
-    }
-  }
-
   const currentConversation = conversations.find(
-    (c) => c.conversation_id === conversationId,
+    (c) => c.conversation_id === activeConversationId,
   )
   const currentTitle =
     currentConversation?.title ||
     (messages.length > 0 ? 'Clinical Consultation' : 'New Consultation')
   const currentChatCode =
-    currentConversation?.chat_code || encodeChatCode(conversationId)
+    currentConversation?.chat_code || encodeChatCode(activeConversationId)
 
   return (
-    <div className="flex h-full w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs">
-      {/* Collapsible Left Chat History Sidebar */}
-      <aside
-        className={`transition-all duration-200 border-r border-slate-200 bg-slate-50/70 flex flex-col shrink-0 ${
-          isHistoryOpen ? 'w-60 sm:w-64' : 'w-0 border-r-0 overflow-hidden'
-        }`}
-      >
-        {/* History Header & + New Chat */}
-        <div className="p-3 border-b border-slate-200/80 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <MessageSquare className="h-3.5 w-3.5 text-teal-700" />
-              Chat History
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsHistoryOpen(false)}
-              className="rounded-lg p-1 text-slate-400 hover:bg-slate-200/60 transition"
-              title="Close history"
-            >
-              <PanelLeftClose className="h-4 w-4" />
-            </button>
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
+      {/* Top Header with crisp visible stroke */}
+      <div className="flex items-center justify-between border-b border-slate-300 px-3 py-2.5 sm:px-4 bg-white shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 border border-slate-300 overflow-hidden">
+            <img src="/logo.png" alt="PHA" className="h-6 w-6 object-contain" />
           </div>
 
+          <div className="truncate">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Clinical Health Assistant
+              </span>
+
+              {selectedModel === 'pha-0.1.1' ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  PHA ∞ Unlimited
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-800 border border-teal-200">
+                  {usage ? `${usage.used || 0}/${usage.limit || 20} used` : 'Daily Quota'}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 truncate">
+              <h2 className="text-xs sm:text-sm font-bold text-slate-800 truncate">
+                {currentTitle}
+              </h2>
+              {activeConversationId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingConvId(activeConversationId)
+                    setEditTitleText(currentTitle)
+                  }}
+                  className="text-slate-400 hover:text-teal-700 transition p-0.5"
+                  title="Rename chat"
+                >
+                  <Edit3 className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Share Chat Button */}
+          {activeConversationId && messages.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsShareModalOpen(true)}
+              className="inline-flex items-center gap-1 rounded-xl border border-teal-300 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
+              title="Share this chat via encrypted URL"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+          )}
+
+          {/* New Chat Button */}
           <button
             type="button"
-            onClick={handleStartNewChat}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800 shadow-xs transition"
+            onClick={startNewChat}
+            className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 transition shadow-2xs"
+            title="Start a new consultation"
           >
-            <Plus className="h-4 w-4" />
-            <span>New Chat</span>
+            <Plus className="h-3.5 w-3.5 text-teal-700" />
+            <span className="hidden sm:inline">New Chat</span>
           </button>
         </div>
-
-        {/* History Conversations List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {historyLoading ? (
-            <div className="p-4 text-center text-xs text-slate-400">
-              <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-teal-700/20 border-t-teal-700" />
-              Loading history…
-            </div>
-          ) : conversations.length === 0 ? (
-            <p className="p-4 text-center text-xs text-slate-400">
-              No previous chats yet.
-            </p>
-          ) : (
-            conversations.map((conv) => {
-              const isActive = conv.conversation_id === conversationId
-              const isEditing = editingConvId === conv.conversation_id
-
-              return (
-                <div
-                  key={conv.conversation_id}
-                  onClick={() => !isEditing && handleSelectConversation(conv)}
-                  className={`group flex items-center justify-between rounded-xl px-2.5 py-2 text-xs transition cursor-pointer ${
-                    isActive
-                      ? 'bg-teal-50 text-teal-900 font-semibold ring-1 ring-teal-200 shadow-2xs'
-                      : 'text-slate-700 hover:bg-slate-200/50'
-                  }`}
-                >
-                  {isEditing ? (
-                    <div
-                      className="flex items-center gap-1 w-full"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="text"
-                        value={editTitleText}
-                        onChange={(e) => setEditTitleText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter')
-                            handleSaveRename(conv.conversation_id, e)
-                          if (e.key === 'Escape') setEditingConvId(null)
-                        }}
-                        autoFocus
-                        className="flex-1 rounded-lg border border-teal-400 bg-white px-2 py-1 text-xs outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={(e) => handleSaveRename(conv.conversation_id, e)}
-                        className="rounded-md p-1 text-teal-700 hover:bg-teal-100"
-                        title="Save title"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingConvId(null)}
-                        className="rounded-md p-1 text-slate-400 hover:bg-slate-200"
-                        title="Cancel"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2 truncate">
-                        <MessageSquare className="h-3.5 w-3.5 shrink-0 text-teal-600" />
-                        <span className="truncate">{conv.title || 'Consultation'}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          type="button"
-                          onClick={(e) => handleStartRename(conv, e)}
-                          className="rounded-md p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-                          title="Edit chat name"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) =>
-                            handleDeleteConversation(conv.conversation_id, e)
-                          }
-                          className="rounded-md p-1 text-slate-400 hover:bg-rose-100 hover:text-rose-600"
-                          title="Delete chat"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )
-            })
-          )}
-        </div>
-      </aside>
-
-      {/* Main Conversation Container */}
-      <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200/80 px-3 py-2.5 sm:px-4">
-          <div className="flex items-center gap-2 truncate">
-            {!isHistoryOpen && (
-              <button
-                type="button"
-                onClick={() => setIsHistoryOpen(true)}
-                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
-                title="Open chat history"
-              >
-                <PanelLeftOpen className="h-4 w-4" />
-              </button>
-            )}
-
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 overflow-hidden">
-              <img src="/logo.png" alt="PHA" className="h-7 w-7 object-contain" />
-            </div>
-
-            <div className="truncate">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Clinical Assistant
-                </span>
-
-                {selectedModel === 'pha-0.1.1' ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    PHA ∞ Unlimited
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-800 border border-teal-100">
-                    {usage ? `${usage.used || 0}/${usage.limit || 20} used` : 'Daily Quota'}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1.5 truncate">
-                <h2 className="text-xs sm:text-sm font-bold text-slate-800 truncate">
-                  {currentTitle}
-                </h2>
-                {conversationId && (
-                  <button
-                    type="button"
-                    onClick={(e) =>
-                      currentConversation &&
-                      handleStartRename(currentConversation, e)
-                    }
-                    className="text-slate-400 hover:text-slate-600 transition p-0.5"
-                    title="Rename chat"
-                  >
-                    <Edit3 className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Share Chat Button */}
-            {conversationId && messages.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsShareModalOpen(true)}
-                className="inline-flex items-center gap-1 rounded-xl border border-teal-200 bg-teal-50/70 px-2.5 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
-                title="Share this chat via encrypted URL"
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Share</span>
-              </button>
-            )}
-
-            {/* New Chat Button */}
-            <button
-              type="button"
-              onClick={handleStartNewChat}
-              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 transition shadow-2xs"
-              title="Start a new consultation"
-            >
-              <Plus className="h-3.5 w-3.5 text-teal-700" />
-              <span className="hidden sm:inline">New Chat</span>
-            </button>
-          </div>
-        </div>
+      </div>
 
       {errorMessage && (
         <div
           role="alert"
-          className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900"
+          className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900"
         >
           {errorMessage}
         </div>
@@ -1466,15 +1071,15 @@ export default function ChatPage() {
         ref={messagesContainerRef}
         className="flex-1 space-y-4 overflow-y-auto p-3.5 sm:p-5 overscroll-contain [-webkit-overflow-scrolling:touch]"
       >
-        {historyLoading && (
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-600">
+        {loadingHistory && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
             <span className="mr-2 inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-teal-700/20 border-t-teal-700" />
             Loading conversation history…
           </div>
         )}
 
-        {!historyLoading && messages.length === 0 && !loading && (
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 sm:p-5 text-xs sm:text-sm text-slate-600 space-y-3">
+        {!loadingHistory && messages.length === 0 && !loading && (
+          <div className="rounded-2xl border border-slate-300 bg-slate-50/70 p-4 sm:p-5 text-xs sm:text-sm text-slate-600 space-y-3 shadow-xs">
             <div>
               <p className="mb-1 font-semibold text-slate-900">
                 Welcome to Personal Health Assistant
@@ -1492,7 +1097,7 @@ export default function ChatPage() {
                     'What are the key differences between cold and flu symptoms?',
                   )
                 }
-                className="rounded-xl border border-slate-200 bg-white p-2.5 text-left text-xs font-medium text-slate-700 hover:border-teal-300 hover:bg-teal-50/40 transition shadow-2xs"
+                className="rounded-xl border border-slate-300 bg-white p-2.5 text-left text-xs font-medium text-slate-700 hover:border-teal-400 hover:bg-teal-50/40 transition shadow-xs"
               >
                 🌡️ Cold vs Flu Symptoms
               </button>
@@ -1503,7 +1108,7 @@ export default function ChatPage() {
                     'What precautions should I take when taking antibiotics like amoxicillin?',
                   )
                 }
-                className="rounded-xl border border-slate-200 bg-white p-2.5 text-left text-xs font-medium text-slate-700 hover:border-teal-300 hover:bg-teal-50/40 transition shadow-2xs"
+                className="rounded-xl border border-slate-300 bg-white p-2.5 text-left text-xs font-medium text-slate-700 hover:border-teal-400 hover:bg-teal-50/40 transition shadow-xs"
               >
                 💊 Antibiotic Usage &amp; Precautions
               </button>
@@ -1516,7 +1121,7 @@ export default function ChatPage() {
             key={`${message.role}-${message.created_at || index}-${index}`}
             message={message}
             index={index}
-            conversationId={conversationId}
+            conversationId={activeConversationId}
             isSpeaking={speakingIndex === index}
             onSpeak={handleSpeak}
             onEditMessage={handleEditMessage}
@@ -1526,10 +1131,10 @@ export default function ChatPage() {
         {/* Loading Indicator (Clean, without duplicate stop button) */}
         {loading && (
           <div className="flex items-end justify-start gap-2.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 shadow-2xs overflow-hidden">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 border border-slate-300 shadow-xs overflow-hidden">
               <img src="/logo.png" alt="PHA" className="h-6 w-6 object-contain" />
             </div>
-            <div className="rounded-2xl rounded-bl-xs border border-slate-200/80 bg-slate-50 px-4 py-2.5 shadow-2xs">
+            <div className="rounded-2xl rounded-bl-xs border border-slate-300 bg-slate-50 px-4 py-2.5 shadow-xs">
               <div className="flex items-center gap-2 py-0.5">
                 <span className="h-2 w-2 animate-bounce rounded-full bg-teal-600 [animation-delay:-0.3s]" />
                 <span className="h-2 w-2 animate-bounce rounded-full bg-teal-600 [animation-delay:-0.15s]" />
@@ -1545,11 +1150,11 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Bar */}
-      <div className="border-t border-slate-200 bg-slate-50/50 p-2.5 sm:p-3 space-y-2">
+      {/* Input Bar with crisp visible border */}
+      <div className="border-t border-slate-300 bg-slate-50/80 p-2.5 sm:p-3 space-y-2 shrink-0">
         {/* Attached Image Preview */}
         {attachedImage && (
-          <div className="rounded-xl border border-teal-200 bg-teal-50/60 p-2 space-y-2">
+          <div className="rounded-xl border border-teal-300 bg-teal-50/70 p-2 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <img
@@ -1583,7 +1188,7 @@ export default function ChatPage() {
                     'What is this medicine related to? Explain active ingredients, dosage, and side effects.',
                   )
                 }
-                className="rounded-lg border border-teal-200 bg-white px-2 py-0.5 text-[11px] font-medium text-teal-800 hover:bg-teal-100 transition"
+                className="rounded-lg border border-teal-300 bg-white px-2 py-0.5 text-[11px] font-medium text-teal-800 hover:bg-teal-100 transition shadow-2xs"
               >
                 💊 What is this medicine?
               </button>
@@ -1594,7 +1199,7 @@ export default function ChatPage() {
                     'Please transcribe and explain this doctor prescription in a table and structured snippet box.',
                   )
                 }
-                className="rounded-lg border border-teal-200 bg-white px-2 py-0.5 text-[11px] font-medium text-teal-800 hover:bg-teal-100 transition"
+                className="rounded-lg border border-teal-300 bg-white px-2 py-0.5 text-[11px] font-medium text-teal-800 hover:bg-teal-100 transition shadow-2xs"
               >
                 📋 Transcribe prescription
               </button>
@@ -1625,8 +1230,8 @@ export default function ChatPage() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={historyLoading || resetting || loading}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-teal-500 hover:text-teal-700 transition"
+            disabled={loadingHistory || loading}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-600 hover:border-teal-500 hover:text-teal-700 transition shadow-2xs"
             title="Upload photo of medicine or prescription"
           >
             <ImagePlus className="h-4 w-4" />
@@ -1644,8 +1249,8 @@ export default function ChatPage() {
                 setIsCameraModalOpen(true)
               }
             }}
-            disabled={historyLoading || resetting || loading}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-teal-500 hover:text-teal-700 transition"
+            disabled={loadingHistory || loading}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-600 hover:border-teal-500 hover:text-teal-700 transition shadow-2xs"
             title="Take photo with camera"
           >
             <Camera className="h-4 w-4" />
@@ -1655,11 +1260,11 @@ export default function ChatPage() {
           <button
             type="button"
             onClick={toggleSpeechRecognition}
-            disabled={historyLoading || resetting || loading}
-            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition ${
+            disabled={loadingHistory || loading}
+            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition shadow-2xs ${
               isListening
                 ? 'border-rose-400 bg-rose-50 text-rose-600 animate-pulse'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-teal-500 hover:text-teal-700'
+                : 'border-slate-300 bg-white text-slate-600 hover:border-teal-500 hover:text-teal-700'
             }`}
             title={
               isListening
@@ -1689,10 +1294,10 @@ export default function ChatPage() {
                 sendQuestion()
               }
             }}
-            disabled={historyLoading || resetting}
+            disabled={loadingHistory}
             enterKeyHint="send"
             autoCapitalize="sentences"
-            className="w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm text-slate-800 outline-none ring-0 transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
+            className="w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm text-slate-800 outline-none ring-0 transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-1 focus:ring-teal-600 shadow-2xs"
             placeholder={
               isListening
                 ? 'Listening… Speak your question now'
@@ -1718,7 +1323,7 @@ export default function ChatPage() {
               type="button"
               onClick={sendQuestion}
               disabled={
-                historyLoading || resetting || (!input.trim() && !attachedImage)
+                loadingHistory || (!input.trim() && !attachedImage)
               }
               className="inline-flex shrink-0 items-center justify-center rounded-xl bg-teal-700 px-3.5 py-2 text-white shadow-xs transition hover:bg-teal-800 disabled:opacity-40"
               title="Send message"
@@ -1728,7 +1333,7 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Bottom Toolbar: Model Selector & Usage */}
+        {/* Bottom Toolbar: Model Selector & Status */}
         <div className="flex items-center justify-between pt-0.5">
           <ModelSelector
             selectedModelId={selectedModel}
@@ -1736,30 +1341,29 @@ export default function ChatPage() {
             usage={usage}
           />
 
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-slate-400 font-medium">
             {selectedModel === 'pha-0.1.1'
               ? 'PHA 0.1.1 Clinical Engine'
               : 'Gemini 3.8 Flash Multimodal'}
           </span>
         </div>
       </div>
+
+      {/* Camera Capture Modal */}
+      <CameraCaptureModal
+        isOpen={isCameraModalOpen}
+        onClose={() => setIsCameraModalOpen(false)}
+        onCapture={handleCameraCapture}
+      />
+
+      {/* Share Conversation Modal */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        conversationId={activeConversationId}
+        chatTitle={currentTitle}
+        chatCode={currentChatCode}
+      />
     </div>
-
-    {/* Camera Capture Modal */}
-    <CameraCaptureModal
-      isOpen={isCameraModalOpen}
-      onClose={() => setIsCameraModalOpen(false)}
-      onCapture={handleCameraCapture}
-    />
-
-    {/* Share Conversation Modal */}
-    <ShareModal
-      isOpen={isShareModalOpen}
-      onClose={() => setIsShareModalOpen(false)}
-      conversationId={conversationId}
-      chatTitle={currentTitle}
-      chatCode={currentChatCode}
-    />
-  </div>
-)
+  )
 }

@@ -99,14 +99,14 @@ export const SnippetBox = memo(function SnippetBox({ title, content }) {
       className={`my-3 overflow-hidden rounded-xl border shadow-xs ${
         isProgramCode
           ? 'border-slate-800 bg-slate-900 text-teal-300'
-          : 'border-slate-200 bg-white text-slate-800 ring-1 ring-slate-100'
+          : 'border-slate-300 bg-white text-slate-800'
       }`}
     >
       <div
         className={`flex items-center justify-between border-b px-3.5 py-2 text-xs ${
           isProgramCode
             ? 'border-slate-800 bg-slate-950/90 text-teal-400'
-            : 'border-slate-100 bg-slate-50/90 text-teal-800'
+            : 'border-slate-300 bg-slate-50 text-teal-800'
         }`}
       >
         <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold tracking-wider">
@@ -296,25 +296,25 @@ export const FormattedMessage = memo(function FormattedMessage({ content }) {
           return (
             <div
               key={idx}
-              className="my-2.5 max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs [-webkit-overflow-scrolling:touch]"
+              className="my-3 max-w-full overflow-x-auto rounded-xl border border-slate-300 bg-white shadow-xs [-webkit-overflow-scrolling:touch]"
             >
-              <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
+              <table className="min-w-full divide-y divide-slate-300 text-left text-xs">
                 {header && (
-                  <thead className="bg-slate-50 font-semibold text-slate-800">
+                  <thead className="bg-slate-100/90 font-semibold text-slate-800">
                     <tr>
                       {header.map((col, colIdx) => (
-                        <th key={colIdx} className="px-3 py-2 whitespace-nowrap">
+                        <th key={colIdx} className="px-3.5 py-2.5 whitespace-nowrap border-b border-slate-300">
                           <InlineMarkdownParser text={col} />
                         </th>
                       ))}
                     </tr>
                   </thead>
                 )}
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody className="divide-y divide-slate-200 text-slate-700 bg-white">
                   {bodyRows.map((row, rowIdx) => (
-                    <tr key={rowIdx} className="hover:bg-slate-50/60 transition">
+                    <tr key={rowIdx} className="hover:bg-slate-50 transition border-b border-slate-200 last:border-b-0">
                       {row.map((cell, cellIdx) => (
-                        <td key={cellIdx} className="px-3 py-2 align-top">
+                        <td key={cellIdx} className="px-3.5 py-2.5 align-top">
                           <InlineMarkdownParser text={cell} />
                         </td>
                       ))}

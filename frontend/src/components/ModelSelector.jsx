@@ -52,8 +52,8 @@ export const UsageModal = memo(function UsageModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-300 bg-white p-5 shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
               <Gauge className="h-4 w-4" />
@@ -164,13 +164,13 @@ export const ModelSelector = memo(function ModelSelector({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+        className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-xs hover:bg-slate-50 transition"
         title="Select AI model"
       >
         <SelectedIcon className="h-3.5 w-3.5 text-teal-600" />
         <span className="font-semibold text-slate-800">{selectedModel.name}</span>
         {selectedModel.tag && (
-          <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">
+          <span className="rounded-md bg-teal-50 border border-teal-200 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">
             {selectedModel.tag}
           </span>
         )}
@@ -183,7 +183,7 @@ export const ModelSelector = memo(function ModelSelector({
 
       {/* Dropdown Menu (Only Gemini 3.8 Flash and PHA 0.1.1) */}
       {isOpen && (
-        <div className="absolute bottom-full left-0 mb-2 w-72 origin-bottom-left rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl z-40 animate-in fade-in duration-100">
+        <div className="absolute bottom-full left-0 mb-2 w-72 origin-bottom-left rounded-2xl border border-slate-300 bg-white p-1.5 shadow-xl z-40 animate-in fade-in duration-100">
           <div className="px-3 pt-2 pb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
               Select AI Model
