@@ -422,3 +422,10 @@ def reset_user_usage(user: dict = Depends(get_current_user)) -> dict[str, Any]:
     """Reset daily tokens/generations usage counter to 0."""
     user_id = user['user_id']
     return store.reset_daily_usage(user_id)
+
+
+@router.post('/api/chat/reset-all-users-usage')
+@router.post('/chat/reset-all-users-usage')
+def reset_all_users_usage() -> dict[str, Any]:
+    """Reset daily token usage across all users and start fresh."""
+    return store.reset_daily_usage(None)

@@ -34,42 +34,59 @@ import { FormattedMessage } from '../components/MarkdownRenderer'
 import { ModelSelector } from '../components/ModelSelector'
 import { useChat, encodeChatCode } from '../context/ChatContext'
 
-// Downscale high-resolution images to prevent upload failures and payload timeouts
-function downscaleImage(file, maxDimension = 1600, quality = 0.85) {
-  return new Promise((resolve, reject) => {
+// Safely process images with fast downscaling and resilient dataUrl fallback
+function processImageFile(file, maxDimension = 1600, quality = 0.85) {
+  return new Promise((resolve) => {
     const reader = new FileReader()
     reader.onload = (e) => {
+      const originalDataUrl = e.target.result
       const img = new Image()
       img.onload = () => {
-        let width = img.width
-        let height = img.height
+        try {
+          let width = img.width
+          let height = img.height
 
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width)
-            width = maxDimension
-          } else {
-            width = Math.round((width * maxDimension) / height)
-            height = maxDimension
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width)
+              width = maxDimension
+            } else {
+              width = Math.round((width * maxDimension) / height)
+              height = maxDimension
+            }
           }
-        }
 
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, width, height)
-        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, width, height)
+          const dataUrl = canvas.toDataURL('image/jpeg', quality)
+          resolve({
+            dataUrl,
+            name: file.name,
+            size: `${Math.round((dataUrl.length * 0.75) / 1024)} KB`,
+          })
+        } catch {
+          resolve({
+            dataUrl: originalDataUrl,
+            name: file.name,
+            size: `${Math.round(file.size / 1024)} KB`,
+          })
+        }
+      }
+      img.onerror = () => {
         resolve({
-          dataUrl,
+          dataUrl: originalDataUrl,
           name: file.name,
-          size: `${Math.round((dataUrl.length * 0.75) / 1024)} KB`,
+          size: `${Math.round(file.size / 1024)} KB`,
         })
       }
-      img.onerror = reject
-      img.src = e.target.result
+      img.src = originalDataUrl
     }
-    reader.onerror = reject
+    reader.onerror = () => {
+      resolve(null)
+    }
     reader.readAsDataURL(file)
   })
 }
@@ -755,21 +772,21 @@ export default function ChatPage() {
     ])
   }
 
-  // Handle Image File Selection with auto-downscaling
+  // Handle Image File Selection with auto-downscaling and fallback preview
   const handleImageFileChange = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    if (!file.type.startsWith('image/')) {
-      setErrorMessage('Please select a valid image file (JPEG, PNG, WEBP).')
-      return
-    }
-
     try {
-      const downscaled = await downscaleImage(file)
-      setAttachedImage(downscaled)
+      const processed = await processImageFile(file)
+      if (processed?.dataUrl) {
+        setAttachedImage(processed)
+        setErrorMessage('')
+      } else {
+        setErrorMessage('Failed to read image. Please select a valid picture.')
+      }
     } catch (e) {
-      console.error('Image compression failed:', e)
+      console.error('Image processing failed:', e)
       setErrorMessage('Failed to process image. Please try another photo.')
     } finally {
       event.target.value = ''
@@ -1153,63 +1170,35 @@ export default function ChatPage() {
 
       {/* Input Bar with crisp visible border */}
       <div className="border-t border-slate-300 bg-slate-50/80 p-2.5 sm:p-3 space-y-2 shrink-0">
-        {/* Attached Image Preview */}
-        {attachedImage && (
-          <div className="rounded-xl border border-teal-300 bg-teal-50/70 p-2 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <img
-                  src={attachedImage.dataUrl}
-                  alt="Preview"
-                  className="h-11 w-11 rounded-lg border border-teal-300 object-cover"
-                />
-                <div>
-                  <p className="text-xs font-semibold text-slate-800 truncate max-w-xs">
-                    {attachedImage.name}
-                  </p>
-                  <p className="text-[10px] text-teal-700 font-medium">
-                    {attachedImage.size} • Ready for analysis
-                  </p>
-                </div>
+        {/* Modern Enclosed Card Input: Thumbnail on Top, Textarea, Tools & Send on Bottom */}
+        <div className="rounded-2xl border border-slate-300 bg-white p-2 shadow-xs transition focus-within:border-teal-600 focus-within:ring-1 focus-within:ring-teal-600">
+          {/* Clean Media Preview Thumbnail (No unnecessary bulky text buttons) */}
+          {attachedImage && (
+            <div className="relative inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50/80 p-1.5 mb-1.5 ml-1">
+              <img
+                src={attachedImage.dataUrl}
+                alt="Attached preview"
+                className="h-12 w-12 rounded-lg border border-teal-300 object-cover shadow-2xs"
+              />
+              <div className="min-w-0 pr-6">
+                <p className="text-xs font-semibold text-slate-800 truncate max-w-[160px] sm:max-w-xs">
+                  {attachedImage.name}
+                </p>
+                <p className="text-[10px] text-teal-700 font-medium">
+                  {attachedImage.size}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setAttachedImage(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-teal-100 hover:text-slate-600 transition"
+                className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-slate-600 hover:bg-rose-500 hover:text-white transition"
+                title="Remove attached image"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3 w-3" />
               </button>
             </div>
+          )}
 
-            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-              <button
-                type="button"
-                onClick={() =>
-                  setInput(
-                    'What is this medicine related to? Explain active ingredients, dosage, and side effects.',
-                  )
-                }
-                className="rounded-lg border border-teal-300 bg-white px-2 py-0.5 text-[11px] font-medium text-teal-800 hover:bg-teal-100 transition shadow-2xs"
-              >
-                💊 What is this medicine?
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setInput(
-                    'Please transcribe and explain this doctor prescription in a table and structured snippet box.',
-                  )
-                }
-                className="rounded-lg border border-teal-300 bg-white px-2 py-0.5 text-[11px] font-medium text-teal-800 hover:bg-teal-100 transition shadow-2xs"
-              >
-                📋 Transcribe prescription
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Modern Enclosed Card Input: Textarea on Top, Tools & Send on Bottom */}
-        <div className="rounded-2xl border border-slate-300 bg-white p-2 shadow-xs transition focus-within:border-teal-600 focus-within:ring-1 focus-within:ring-teal-600">
           {/* Hidden File Inputs */}
           <input
             type="file"
@@ -1227,20 +1216,23 @@ export default function ChatPage() {
             className="hidden"
           />
 
-          {/* Full-width Responsive Textarea */}
+          {/* Full-width Responsive Textarea with Enter to send, Shift+Enter for newline */}
           <textarea
             ref={textareaRef}
             rows={1}
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
-              if (
-                event.key === 'Enter' &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing
-              ) {
+              if (event.key === 'Enter' || event.keyCode === 13) {
+                if (event.shiftKey) {
+                  // Allow Shift + Enter to insert a new line
+                  return
+                }
+                // Enter without Shift: sends the message immediately
                 event.preventDefault()
-                sendQuestion()
+                if (!loading && !loadingHistory && (input.trim() || attachedImage)) {
+                  sendQuestion()
+                }
               }
             }}
             disabled={loadingHistory}
@@ -1251,7 +1243,7 @@ export default function ChatPage() {
               isListening
                 ? 'Listening… Speak your question now'
                 : attachedImage
-                ? 'Ask about this medicine or prescription…'
+                ? 'Ask about this attached photo…'
                 : 'Ask a health question, attach a medicine photo, or use voice…'
             }
           />
