@@ -104,9 +104,9 @@ app.include_router(profile_router)
 @app.get("/api/version")
 def version():
     return {
-        "version": "1.0.2",
-        "commit": "render-lightweight-fast-search",
-        "timestamp": "2026-11-14T17:25:00"
+        "version": "1.0.3",
+        "commit": "pha-vision-multimodal-routing",
+        "timestamp": "2026-11-16T17:02:00",
     }
 
 
