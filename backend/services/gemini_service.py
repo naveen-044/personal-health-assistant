@@ -11,9 +11,10 @@ logger = logging.getLogger('uvicorn.error')
 
 GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 DEFAULT_GEMINI_MODELS = [
-    'gemini-2.5-flash',
-    'gemini-1.5-flash',
-    'gemini-2.0-flash',
+    'gemini-3.8-flash',
+    'gemini-3-flash-preview',
+    'gemini-3.5-flash',
+    'gemini-flash-latest',
 ]
 
 SYSTEM_PROMPT = """You are a highly capable Clinical and Pharmaceutical AI Assistant integrated into the Personal Health Assistant platform.
@@ -153,8 +154,10 @@ def call_gemini_api(
 
     for target_model in models_to_try:
         url = f"{GEMINI_BASE_URL}/{target_model}:generateContent?key={key}"
+        # Use a quick 8s timeout on 3.8-flash during demand spikes to failover instantly
+        timeout_val = 8.0 if target_model == 'gemini-3.8-flash' else 30.0
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=timeout_val) as client:
                 response = client.post(
                     url,
                     headers={'Content-Type': 'application/json'},
@@ -186,13 +189,18 @@ def call_gemini_api(
             if response.status_code == 429:
                 raise GeminiQuotaError('Gemini API rate limit or quota exceeded. Please wait a moment or try again later.')
 
-            # If 404 (model not found), try the next fallback model
-            if response.status_code == 404:
+            # If 404 (model not found) or 503 (temporary high demand), try next fallback model
+            if response.status_code in (404, 503):
+                logger.warning("Gemini model %s returned %d, trying fallback...", target_model, response.status_code)
                 continue
 
             last_error = GeminiError(f"Gemini API returned status {response.status_code}: {response.text[:200]}")
         except (GeminiConfigError, GeminiQuotaError):
             raise
+        except httpx.TimeoutException as exc:
+            last_error = exc
+            logger.warning("Timeout connecting to Gemini model %s, trying fallback...", target_model)
+            continue
         except Exception as exc:
             last_error = exc
             logger.warning("Error invoking Gemini model %s: %s", target_model, exc)
