@@ -431,7 +431,7 @@ function AppShell() {
         <main
           className={`flex-1 min-w-0 ${
             isChatRoute
-              ? 'h-[calc(100dvh-3rem)] overflow-hidden p-2 sm:p-3'
+              ? 'h-[calc(100dvh-3rem)] overflow-hidden p-1 sm:p-3'
               : 'overflow-y-auto p-4 sm:p-6 max-w-5xl w-full mx-auto'
           }`}
         >

@@ -412,7 +412,7 @@ const ChatMessageItem = memo(function ChatMessageItem({
       )}
 
       <div
-        className={`relative max-w-2xl rounded-2xl px-4 py-3 shadow-2xs ${
+        className={`relative max-w-[88%] sm:max-w-2xl rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-2xs ${
           isUser
             ? 'rounded-tr-xs bg-teal-700 text-white'
             : 'rounded-tl-xs border border-slate-200/80 bg-white text-slate-800'
@@ -986,31 +986,31 @@ export default function ChatPage() {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
       {/* Top Header with crisp visible stroke */}
-      <div className="flex items-center justify-between border-b border-slate-300 px-3 py-2.5 sm:px-4 bg-white shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex items-center justify-between border-b border-slate-300 px-2.5 py-2 sm:px-4 sm:py-2.5 bg-white shrink-0 gap-1.5">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 border border-slate-300 overflow-hidden">
             <img src="/logo.png" alt="PHA" className="h-6 w-6 object-contain" />
           </div>
 
-          <div className="truncate">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden xs:inline">
                 Clinical Health Assistant
               </span>
 
               {selectedModel === 'pha-0.1.1' ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-300">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-300 shrink-0">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   PHA ∞ Unlimited
                 </span>
               ) : (
-                <span className="inline-flex items-center rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-800 border border-teal-200">
+                <span className="inline-flex items-center rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-800 border border-teal-200 shrink-0">
                   {usage ? `${usage.used || 0}/${usage.limit || 20} used` : 'Daily Quota'}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 truncate">
+            <div className="flex items-center gap-1.5 min-w-0">
               <h2 className="text-xs sm:text-sm font-bold text-slate-800 truncate">
                 {currentTitle}
               </h2>
@@ -1021,7 +1021,7 @@ export default function ChatPage() {
                     setEditingConvId(activeConversationId)
                     setEditTitleText(currentTitle)
                   }}
-                  className="text-slate-400 hover:text-teal-700 transition p-0.5"
+                  className="text-slate-400 hover:text-teal-700 transition p-0.5 shrink-0"
                   title="Rename chat"
                 >
                   <Edit3 className="h-3 w-3" />
@@ -1037,7 +1037,7 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={() => setIsShareModalOpen(true)}
-              className="inline-flex items-center gap-1 rounded-xl border border-teal-300 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
+              className="inline-flex items-center gap-1 rounded-xl border border-teal-300 bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
               title="Share this chat via encrypted URL"
             >
               <Share2 className="h-3.5 w-3.5" />
@@ -1049,11 +1049,11 @@ export default function ChatPage() {
           <button
             type="button"
             onClick={startNewChat}
-            className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 transition shadow-2xs"
+            className="inline-flex items-center justify-center h-8 w-8 sm:w-auto sm:px-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-100 transition shadow-2xs"
             title="Start a new consultation"
           >
-            <Plus className="h-3.5 w-3.5 text-teal-700" />
-            <span className="hidden sm:inline">New Chat</span>
+            <Plus className="h-4 w-4 text-teal-700" />
+            <span className="hidden sm:inline ml-1">New Chat</span>
           </button>
         </div>
       </div>
@@ -1208,8 +1208,8 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Text Input Row */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Modern Enclosed Card Input: Textarea on Top, Tools & Send on Bottom */}
+        <div className="rounded-2xl border border-slate-300 bg-white p-2 shadow-xs transition focus-within:border-teal-600 focus-within:ring-1 focus-within:ring-teal-600">
           {/* Hidden File Inputs */}
           <input
             type="file"
@@ -1227,59 +1227,7 @@ export default function ChatPage() {
             className="hidden"
           />
 
-          {/* Upload Image Button */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={loadingHistory || loading}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-600 hover:border-teal-500 hover:text-teal-700 transition shadow-2xs"
-            title="Upload photo of medicine or prescription"
-          >
-            <ImagePlus className="h-4 w-4" />
-          </button>
-
-          {/* Capture Image Button (Webcam / Mobile Camera) */}
-          <button
-            type="button"
-            onClick={() => {
-              const isMobile =
-                /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-              if (isMobile && mobileCameraInputRef.current) {
-                mobileCameraInputRef.current.click()
-              } else {
-                setIsCameraModalOpen(true)
-              }
-            }}
-            disabled={loadingHistory || loading}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-600 hover:border-teal-500 hover:text-teal-700 transition shadow-2xs"
-            title="Take photo with camera"
-          >
-            <Camera className="h-4 w-4" />
-          </button>
-
-          {/* Voice Input (Speech-to-Text) Button */}
-          <button
-            type="button"
-            onClick={toggleSpeechRecognition}
-            disabled={loadingHistory || loading}
-            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition shadow-2xs ${
-              isListening
-                ? 'border-rose-400 bg-rose-50 text-rose-600 animate-pulse'
-                : 'border-slate-300 bg-white text-slate-600 hover:border-teal-500 hover:text-teal-700'
-            }`}
-            title={
-              isListening
-                ? 'Listening… Click to stop'
-                : 'Send voice question (Speech-to-Text)'
-            }
-          >
-            {isListening ? (
-              <MicOff className="h-4 w-4 text-rose-600" />
-            ) : (
-              <Mic className="h-4 w-4" />
-            )}
-          </button>
-
+          {/* Full-width Responsive Textarea */}
           <textarea
             ref={textareaRef}
             rows={1}
@@ -1298,7 +1246,7 @@ export default function ChatPage() {
             disabled={loadingHistory}
             enterKeyHint="send"
             autoCapitalize="sentences"
-            className="w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm text-slate-800 outline-none ring-0 transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-1 focus:ring-teal-600 shadow-2xs"
+            className="w-full resize-none bg-transparent px-1.5 py-1 text-xs sm:text-sm text-slate-800 outline-none placeholder:text-slate-400 min-h-[38px] sm:min-h-[44px] max-h-36 leading-relaxed"
             placeholder={
               isListening
                 ? 'Listening… Speak your question now'
@@ -1308,30 +1256,89 @@ export default function ChatPage() {
             }
           />
 
-          {/* SINGLE STOP or SEND Button */}
-          {loading ? (
-            <button
-              type="button"
-              onClick={stopGeneration}
-              className="inline-flex shrink-0 items-center justify-center gap-1 rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 transition"
-              title="Stop response"
-            >
-              <Square className="h-3.5 w-3.5 fill-current" />
-              <span className="hidden sm:inline">Stop</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={sendQuestion}
-              disabled={
-                loadingHistory || (!input.trim() && !attachedImage)
-              }
-              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-teal-700 px-3.5 py-2 text-white shadow-xs transition hover:bg-teal-800 disabled:opacity-40"
-              title="Send message"
-            >
-              <SendHorizontal className="h-4 w-4" />
-            </button>
-          )}
+          {/* Action Row: Left Tools (Image, Camera, Mic) & Right Actions (Stop / Send) */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+            <div className="flex items-center gap-1">
+              {/* Upload Image Button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loadingHistory || loading}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-teal-700 transition"
+                title="Upload photo of medicine or prescription"
+              >
+                <ImagePlus className="h-4 w-4" />
+              </button>
+
+              {/* Capture Image Button (Webcam / Mobile Camera) */}
+              <button
+                type="button"
+                onClick={() => {
+                  const isMobile =
+                    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+                  if (isMobile && mobileCameraInputRef.current) {
+                    mobileCameraInputRef.current.click()
+                  } else {
+                    setIsCameraModalOpen(true)
+                  }
+                }}
+                disabled={loadingHistory || loading}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-teal-700 transition"
+                title="Take photo with camera"
+              >
+                <Camera className="h-4 w-4" />
+              </button>
+
+              {/* Voice Input (Speech-to-Text) Button */}
+              <button
+                type="button"
+                onClick={toggleSpeechRecognition}
+                disabled={loadingHistory || loading}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                  isListening
+                    ? 'bg-rose-100 text-rose-600 animate-pulse'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-teal-700'
+                }`}
+                title={
+                  isListening
+                    ? 'Listening… Click to stop'
+                    : 'Send voice question (Speech-to-Text)'
+                }
+              >
+                {isListening ? (
+                  <MicOff className="h-4 w-4 text-rose-600" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+
+            {/* Right: Stop or Send */}
+            <div>
+              {loading ? (
+                <button
+                  type="button"
+                  onClick={stopGeneration}
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-xl bg-rose-600 px-3 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 transition"
+                  title="Stop response"
+                >
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                  <span className="hidden sm:inline">Stop</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={sendQuestion}
+                  disabled={loadingHistory || (!input.trim() && !attachedImage)}
+                  className="inline-flex h-8 w-8 sm:w-auto sm:px-3.5 items-center justify-center gap-1 rounded-xl bg-teal-700 text-white shadow-xs transition hover:bg-teal-800 disabled:opacity-40"
+                  title="Send message"
+                >
+                  <SendHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline text-xs font-medium">Send</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Bottom Toolbar: Model Selector & Status */}
@@ -1343,7 +1350,7 @@ export default function ChatPage() {
             onResetUsage={fetchUsage}
           />
 
-          <span className="text-[11px] text-slate-400 font-medium">
+          <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
             {selectedModel === 'pha-0.1.1'
               ? 'PHA 0.1.1 Clinical Engine'
               : 'Gemini 3.8 Flash Multimodal'}
