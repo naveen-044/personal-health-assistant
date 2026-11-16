@@ -15,6 +15,7 @@ from backend.services.gemini_service import (
     GeminiConfigError,
     GeminiError,
     GeminiQuotaError,
+    async_call_gemini_api,
     call_gemini_api,
     parse_image_payload,
 )
@@ -22,6 +23,17 @@ from backend.services.rag_pipeline import LLMProviderError, rag_pipeline
 
 logger = logging.getLogger('uvicorn.error')
 router = APIRouter()
+
+
+def is_conversational_query(text: str) -> bool:
+    """Identify short conversational pleasantries to bypass heavy embedding calculation."""
+    clean = text.strip().lower().rstrip('!?.,:;')
+    greetings = {
+        'hi', 'hello', 'hey', 'greetings', 'good morning', 'good afternoon',
+        'good evening', 'howdy', 'hola', 'sup', 'yo', 'thanks', 'thank you',
+        'bye', 'goodbye', 'who are you', 'what are you', 'help', 'ok', 'okay',
+    }
+    return clean in greetings or len(clean.split()) <= 1
 
 
 @router.get('/api/chat/usage')
@@ -124,23 +136,28 @@ async def answer_question(request: Request, user: dict = Depends(get_current_use
                 detail=f"Daily limit of {settings.GEMINI_DAILY_LIMIT} generations reached for today. Resets daily at 00:00 UTC.",
             )
 
-        # Retrieve grounding context from indexed medical library if available
+        # Retrieve grounding context from indexed medical library for substantive clinical questions
         retrieved = []
         context_text = ""
-        try:
-            retrieved = rag_pipeline.retrieve(payload.question, n_results=3)
-            if retrieved:
-                context_text = rag_pipeline.format_context(retrieved)
-        except Exception as exc:
-            logger.debug("Medical library retrieval note: %s", exc)
+        if not is_conversational_query(payload.question) and not image_data:
+            try:
+                retrieved = rag_pipeline.search(payload.question, top_k=3, user_id=user_id)
+                if retrieved:
+                    context_text = "\n\n".join(
+                        f"Source: {item.get('source') or item.get('filename')}\nSection: {item.get('section')}\nContent: {item.get('snippet')}"
+                        for item in retrieved
+                    )
+            except Exception as exc:
+                logger.debug("Medical library retrieval note: %s", exc)
 
         parsed_image = parse_image_payload(image_data) if image_data else None
 
         try:
-            gemini_res = call_gemini_api(
+            gemini_res = await async_call_gemini_api(
                 prompt=payload.question,
                 image_payload=parsed_image,
                 api_key=custom_api_key or None,
+                model_name=payload.model,
                 context_text=context_text,
                 user_profile=profile,
                 system_prompt_type='pha' if is_pha_selected else 'gemini',
@@ -157,12 +174,12 @@ async def answer_question(request: Request, user: dict = Depends(get_current_use
 
         sources = [
             {
-                'source': (doc.get('metadata') or {}).get('filename') or (doc.get('metadata') or {}).get('source') or 'Medical Library',
-                'section': (doc.get('metadata') or {}).get('section') or (doc.get('metadata') or {}).get('title') or 'Reference',
-                'snippet': (doc.get('text') or '')[:300],
-                'category': (doc.get('metadata') or {}).get('category'),
-                'reviewed': (doc.get('metadata') or {}).get('reviewed'),
-                'references': (doc.get('metadata') or {}).get('references') or [],
+                'source': doc.get('filename') or doc.get('source') or 'Medical Library',
+                'section': doc.get('section') or 'Reference',
+                'snippet': (doc.get('snippet') or '')[:300],
+                'category': doc.get('category'),
+                'reviewed': doc.get('reviewed'),
+                'references': doc.get('references') or [],
             }
             for doc in retrieved
         ]
