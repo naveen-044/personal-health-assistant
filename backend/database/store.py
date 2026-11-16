@@ -140,6 +140,9 @@ class InMemoryStore:
             self.documents[user_id] = updated
             return True
 
+    def close(self) -> None:
+        pass
+
 
 class MongoStore:
     def __init__(self, uri: str, db_name: str = 'personal_health_assistant') -> None:
@@ -351,6 +354,13 @@ class MongoStore:
     def remove_document(self, user_id: str, document_id: str) -> bool:
         result = self.documents.delete_one({'user_id': user_id, 'document_id': document_id})
         return result.deleted_count > 0
+
+    def close(self) -> None:
+        if hasattr(self, 'client') and self.client:
+            try:
+                self.client.close()
+            except Exception:
+                pass
 
 
 def create_store() -> InMemoryStore | MongoStore:

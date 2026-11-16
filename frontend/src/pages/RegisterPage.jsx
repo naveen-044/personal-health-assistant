@@ -4,12 +4,16 @@ import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import api from '../services/api'
 
-const MONGODB_UNAVAILABLE_MESSAGE = 'MongoDB is unavailable. Configure a reachable MongoDB Atlas connection.'
-
 function getErrorMessage(error) {
   const detail = error.response?.data?.detail
   if (Array.isArray(detail)) return detail.map((item) => item.msg).join(' ')
-  return typeof detail === 'string' ? detail : 'We could not create your account. Please try again.'
+  if (typeof detail === 'string') {
+    if (/mongo|database|atlas|connection/i.test(detail)) {
+      return 'Account registration is temporarily unavailable. Please try again later.'
+    }
+    return detail
+  }
+  return 'We could not create your account. Please try again.'
 }
 
 function passwordStrength(password) {
@@ -40,42 +44,9 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [databaseStatus, setDatabaseStatus] = useState('checking')
   const redirectTimer = useRef(null)
 
   useEffect(() => () => window.clearTimeout(redirectTimer.current), [])
-
-  useEffect(() => {
-    let active = true
-
-    api.get('/api/health/database', { timeout: 5000 })
-      .then(({ data }) => {
-        if (!active) return
-        if (data.database_connected === true) {
-          setDatabaseStatus('connected')
-          setError((current) => current === MONGODB_UNAVAILABLE_MESSAGE ? '' : current)
-        } else if (data.database_connected === false) {
-          setDatabaseStatus('unavailable')
-        } else {
-          setDatabaseStatus('unknown')
-        }
-      })
-      .catch((healthError) => {
-        if (!active) return
-        const detail = healthError.response?.data?.detail
-        if (healthError.response?.status === 503 && detail?.database_connected === false) {
-          setDatabaseStatus('unavailable')
-        } else if (!healthError.response) {
-          setDatabaseStatus('backend-unreachable')
-        } else {
-          setDatabaseStatus('unknown')
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
 
   const handleChange = (event) => {
     const { name, value, checked, type } = event.target
@@ -148,12 +119,6 @@ export default function RegisterPage() {
         <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">A healthier way to stay informed</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">Set up your private Personal Health Assistant workspace.</p>
       </div>
-
-      {databaseStatus === 'checking' && <p role="status" className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">Checking database connection…</p>}
-      {databaseStatus === 'connected' && <p role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">MongoDB connection verified.</p>}
-      {databaseStatus === 'unavailable' && <p role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{MONGODB_UNAVAILABLE_MESSAGE}</p>}
-      {databaseStatus === 'backend-unreachable' && <p role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Could not reach the FastAPI backend. Check that it is running at http://127.0.0.1:8001.</p>}
-      {databaseStatus === 'unknown' && <p role="status" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Could not verify database status. Please try again shortly.</p>}
 
       {error && <p role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>}
       {success && <p role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{success}</p>}

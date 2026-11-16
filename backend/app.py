@@ -25,6 +25,12 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[Startup] Auto-ingestion note: {exc}")
     yield
+    try:
+        from backend.database.store import store
+        if hasattr(store, 'close'):
+            store.close()
+    except Exception:
+        pass
 
 
 app = FastAPI(

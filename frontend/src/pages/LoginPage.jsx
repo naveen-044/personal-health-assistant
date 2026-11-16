@@ -7,7 +7,13 @@ import { useAuth } from '../auth/useAuth'
 function getErrorMessage(error) {
   const detail = error.response?.data?.detail
   if (Array.isArray(detail)) return detail.map((item) => item.msg).join(' ')
-  return typeof detail === 'string' ? detail : 'We could not sign you in. Please try again.'
+  if (typeof detail === 'string') {
+    if (/mongo|database|atlas|connection/i.test(detail)) {
+      return 'Sign-in is temporarily unavailable. Please try again later.'
+    }
+    return detail
+  }
+  return 'We could not sign you in. Please try again.'
 }
 
 export default function LoginPage() {
