@@ -20,6 +20,7 @@ from backend.services.gemini_service import (
     call_gemini_api,
     parse_image_payload,
 )
+from backend.services.pha_engine import call_pha_model
 from backend.services.rag_pipeline import LLMProviderError, rag_pipeline
 
 logger = logging.getLogger('uvicorn.error')
@@ -177,25 +178,37 @@ async def answer_question(request: Request, user: dict = Depends(get_current_use
 
         parsed_image = parse_image_payload(image_data) if image_data else None
 
-        try:
-            gemini_res = await async_call_gemini_api(
+        if is_pha_selected:
+            pha_res = await call_pha_model(
                 prompt=payload.question,
                 image_payload=parsed_image,
-                api_key=custom_api_key or None,
-                model_name=payload.model,
                 context_text=context_text,
                 user_profile=profile,
-                system_prompt_type='pha' if is_pha_selected else 'gemini',
             )
-        except GeminiConfigError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        except GeminiQuotaError as exc:
-            raise HTTPException(status_code=429, detail=str(exc)) from exc
-        except GeminiError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-        except Exception as exc:
-            logger.error("Unexpected error in processing: %s", exc)
-            raise HTTPException(status_code=500, detail="Failed to process request.") from exc
+            answer_text = pha_res.get('answer', '')
+            active_model_name = 'PHA 0.1.1'
+        else:
+            try:
+                gemini_res = await async_call_gemini_api(
+                    prompt=payload.question,
+                    image_payload=parsed_image,
+                    api_key=custom_api_key or None,
+                    model_name=payload.model,
+                    context_text=context_text,
+                    user_profile=profile,
+                    system_prompt_type='gemini',
+                )
+                answer_text = gemini_res.get('answer', '')
+                active_model_name = 'Gemini 3.8 Flash'
+            except GeminiConfigError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except GeminiQuotaError as exc:
+                raise HTTPException(status_code=429, detail=str(exc)) from exc
+            except GeminiError as exc:
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
+            except Exception as exc:
+                logger.error("Unexpected error in processing: %s", exc)
+                raise HTTPException(status_code=500, detail="Failed to process request.") from exc
 
         sources = [
             {
@@ -223,14 +236,13 @@ async def answer_question(request: Request, user: dict = Depends(get_current_use
         else:
             updated_usage = usage
 
-        active_model_name = 'PHA 0.1.1' if is_pha_selected else 'Gemini 3.8 Flash'
         chat_code = encode_conversation_code(conversation_id)
 
         store.append_turn(
             user_id,
             conversation_id,
             payload.question,
-            gemini_res['answer'],
+            answer_text,
             sources,
             image=image_data,
         )
@@ -238,7 +250,7 @@ async def answer_question(request: Request, user: dict = Depends(get_current_use
         return {
             'conversation_id': conversation_id,
             'chat_code': chat_code,
-            'answer': gemini_res['answer'],
+            'answer': answer_text,
             'sources': sources,
             'safety_notice': 'This chatbot provides general educational health information and prescription transcription and is not a diagnosis or replacement for a clinician.',
             'model': active_model_name,
@@ -392,3 +404,21 @@ def delete_history(conversation_id: str, user: dict = Depends(get_current_user))
     if not deleted and target_id != conversation_id:
         deleted = store.delete_conversation(user_id, conversation_id)
     return {'status': 'deleted', 'conversation_id': target_id, 'existed': deleted}
+
+
+@router.post('/api/chat/reset-all')
+@router.post('/chat/reset-all')
+@router.delete('/api/chat/reset-all')
+@router.delete('/chat/reset-all')
+def reset_all_user_data(user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    """Wipe all conversations, feedback, and reset daily token usage to 0 for the user."""
+    user_id = user['user_id']
+    return store.reset_all_data(user_id)
+
+
+@router.post('/api/chat/reset-usage')
+@router.post('/chat/reset-usage')
+def reset_user_usage(user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    """Reset daily tokens/generations usage counter to 0."""
+    user_id = user['user_id']
+    return store.reset_daily_usage(user_id)

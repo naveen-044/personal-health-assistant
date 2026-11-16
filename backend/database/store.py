@@ -218,6 +218,32 @@ class InMemoryStore:
             self.documents[user_id] = updated
             return True
 
+    def reset_daily_usage(self, user_id: str | None = None, service: str | None = None) -> dict[str, Any]:
+        with self._lock:
+            if user_id:
+                keys = [k for k in self.daily_usage if k[0] == user_id and (service is None or k[1] == service)]
+                for k in keys:
+                    self.daily_usage.pop(k, None)
+            else:
+                self.daily_usage.clear()
+        return {'status': 'success', 'message': 'Daily token usage reset to 0.'}
+
+    def reset_all_data(self, user_id: str | None = None) -> dict[str, Any]:
+        with self._lock:
+            if user_id:
+                self.conversations.pop(user_id, None)
+                self.documents.pop(user_id, None)
+                keys = [k for k in self.daily_usage if k[0] == user_id]
+                for k in keys:
+                    self.daily_usage.pop(k, None)
+                self.feedback = [f for f in self.feedback if f.get('user_id') != user_id]
+            else:
+                self.conversations.clear()
+                self.documents.clear()
+                self.daily_usage.clear()
+                self.feedback.clear()
+        return {'status': 'success', 'message': 'All data and token counters reset to zero.'}
+
     def close(self) -> None:
         pass
 
@@ -539,6 +565,32 @@ class MongoStore:
     def remove_document(self, user_id: str, document_id: str) -> bool:
         result = self.documents.delete_one({'user_id': user_id, 'document_id': document_id})
         return result.deleted_count > 0
+
+    def reset_daily_usage(self, user_id: str | None = None, service: str | None = None) -> dict[str, Any]:
+        query = {}
+        if user_id:
+            query['user_id'] = user_id
+        if service:
+            query['service'] = service
+        try:
+            if self.daily_usage is not None:
+                self.daily_usage.delete_many(query)
+        except Exception as exc:
+            logger.error('Error resetting usage in MongoStore: %s', exc)
+        return {'status': 'success', 'message': 'Daily token usage reset to 0.'}
+
+    def reset_all_data(self, user_id: str | None = None) -> dict[str, Any]:
+        query = {'user_id': user_id} if user_id else {}
+        try:
+            self.conversations.delete_many(query)
+            self.documents.delete_many(query)
+            if self.daily_usage is not None:
+                self.daily_usage.delete_many(query)
+            if self.feedback is not None:
+                self.feedback.delete_many(query)
+        except Exception as exc:
+            logger.error('Error resetting all data in MongoStore: %s', exc)
+        return {'status': 'success', 'message': 'All data and token counters reset to zero.'}
 
     def close(self) -> None:
         if hasattr(self, 'client') and self.client:

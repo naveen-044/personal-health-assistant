@@ -5,10 +5,12 @@ import {
   ChevronRight,
   ChevronUp,
   Gauge,
+  RotateCcw,
   Sparkles,
   Stethoscope,
   X,
 } from 'lucide-react'
+import api from '../services/api'
 
 export const MODEL_OPTIONS = [
   {
@@ -31,13 +33,50 @@ export const UsageModal = memo(function UsageModal({
   isOpen,
   onClose,
   usage,
+  onResetUsage,
 }) {
+  const [resetting, setResetting] = useState(false)
+  const [resetMessage, setResetMessage] = useState('')
+
   if (!isOpen) return null
 
   const used = usage?.used || 0
   const limit = usage?.limit || 20
   const remaining = usage?.remaining !== undefined ? usage.remaining : Math.max(0, limit - used)
   const percent = Math.min(100, Math.round((used / limit) * 100))
+
+  const handleResetUsage = async () => {
+    setResetting(true)
+    setResetMessage('')
+    try {
+      await api.post('/api/chat/reset-usage')
+      setResetMessage('✓ Tokens reset to 0')
+      if (onResetUsage) onResetUsage()
+      setTimeout(() => setResetMessage(''), 3000)
+    } catch (err) {
+      console.error('Reset usage error:', err)
+      setResetMessage('Failed to reset tokens')
+    } finally {
+      setResetting(false)
+    }
+  }
+
+  const handleResetAll = async () => {
+    if (!window.confirm('Reset all chats, documents, and reset tokens to zero?')) return
+    setResetting(true)
+    setResetMessage('')
+    try {
+      await api.post('/api/chat/reset-all')
+      setResetMessage('✓ All data & tokens reset')
+      if (onResetUsage) onResetUsage()
+      window.location.reload()
+    } catch (err) {
+      console.error('Reset all data error:', err)
+      setResetMessage('Failed to reset data')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   const formattedDate = (() => {
     if (usage?.date && /^\d{2}-\d{2}-\d{4}$/.test(usage.date)) {
@@ -116,11 +155,40 @@ export const UsageModal = memo(function UsageModal({
           <p>Both <strong>Gemini 3.8 Flash</strong> and <strong>PHA 0.1.1</strong> are included with multimodal media analysis, voice input, and structured tables.</p>
         </div>
 
-        <div className="mt-4 flex justify-end">
+        {resetMessage && (
+          <p className="mt-2 text-center text-xs font-semibold text-emerald-700">
+            {resetMessage}
+          </p>
+        )}
+
+        <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-200">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleResetUsage}
+              disabled={resetting}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700 hover:text-teal-900 transition disabled:opacity-50"
+              title="Reset daily token counter to zero"
+            >
+              <RotateCcw className="h-3 w-3" />
+              <span>Reset Tokens to 0</span>
+            </button>
+            <span className="text-slate-300">•</span>
+            <button
+              type="button"
+              onClick={handleResetAll}
+              disabled={resetting}
+              className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 transition disabled:opacity-50"
+              title="Reset all chat and data"
+            >
+              Reset All Data
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-teal-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-teal-800 transition"
+            className="rounded-xl bg-teal-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 transition"
           >
             Done
           </button>
@@ -134,6 +202,7 @@ export const ModelSelector = memo(function ModelSelector({
   selectedModelId,
   onSelectModel,
   usage,
+  onResetUsage,
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isUsageOpen, setIsUsageOpen] = useState(false)
@@ -261,6 +330,7 @@ export const ModelSelector = memo(function ModelSelector({
         isOpen={isUsageOpen}
         onClose={() => setIsUsageOpen(false)}
         usage={usage}
+        onResetUsage={onResetUsage}
       />
     </div>
   )

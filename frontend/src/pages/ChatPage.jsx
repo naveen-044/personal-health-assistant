@@ -1339,6 +1339,7 @@ export default function ChatPage() {
             selectedModelId={selectedModel}
             onSelectModel={handleSelectModel}
             usage={usage}
+            onResetUsage={fetchUsage}
           />
 
           <span className="text-[11px] text-slate-400 font-medium">
