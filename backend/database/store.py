@@ -16,6 +16,7 @@ class InMemoryStore:
         self.users = {}
         self.conversations = {}
         self.documents = {}
+        self.daily_usage = {}
 
     def get_or_create_profile(self, user_id: str) -> dict[str, Any]:
         with self._lock:
@@ -67,7 +68,7 @@ class InMemoryStore:
             thread.append(entry)
             return deepcopy(entry)
 
-    def append_turn(self, user_id: str, conversation_id: str, question: str, answer: str, sources: list[dict[str, Any]]) -> dict[str, Any]:
+    def append_turn(self, user_id: str, conversation_id: str, question: str, answer: str, sources: list[dict[str, Any]], image: str | None = None) -> dict[str, Any]:
         with self._lock:
             thread = self.conversations.setdefault(user_id, [])
             match = None
@@ -75,11 +76,14 @@ class InMemoryStore:
                 if item['conversation_id'] == conversation_id:
                     match = item
                     break
+            user_msg = {'role': 'user', 'content': question, 'created_at': 'just now'}
+            if image:
+                user_msg['image'] = image
             if match is None:
                 match = {
                     'conversation_id': conversation_id,
                     'messages': [
-                        {'role': 'user', 'content': question, 'created_at': 'just now'},
+                        user_msg,
                         {'role': 'assistant', 'content': answer, 'created_at': 'just now'}
                     ],
                     'title': question[:48] or 'New conversation',
@@ -88,12 +92,38 @@ class InMemoryStore:
                 }
                 thread.append(match)
                 return deepcopy(match)
-            match['messages'].append({'role': 'user', 'content': question, 'created_at': 'just now'})
+            match['messages'].append(user_msg)
             match['messages'].append({'role': 'assistant', 'content': answer, 'created_at': 'just now'})
             match['updated_at'] = 'just now'
             match['title'] = match['title'] or question[:48]
             match['sources'] = sources
             return deepcopy(match)
+
+    def get_daily_usage(self, user_id: str, service: str = 'gemini', limit: int = 20) -> dict[str, Any]:
+        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        with self._lock:
+            count = self.daily_usage.get((user_id, service, today), 0)
+        return {
+            'service': service,
+            'used': count,
+            'limit': limit,
+            'remaining': max(0, limit - count),
+            'date': today,
+        }
+
+    def increment_daily_usage(self, user_id: str, service: str = 'gemini', limit: int = 20) -> dict[str, Any]:
+        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        with self._lock:
+            key = (user_id, service, today)
+            self.daily_usage[key] = self.daily_usage.get(key, 0) + 1
+            count = self.daily_usage[key]
+        return {
+            'service': service,
+            'used': count,
+            'limit': limit,
+            'remaining': max(0, limit - count),
+            'date': today,
+        }
 
     def delete_conversation(self, user_id: str, conversation_id: str) -> bool:
         with self._lock:
@@ -157,6 +187,11 @@ class MongoStore:
         self.documents = self.db['documents']
         self.auth_users = self.db['users']
         self.auth_sessions = self.db['auth_sessions']
+        try:
+            self.daily_usage = self.db['daily_usage']
+            self.daily_usage.create_index([('user_id', 1), ('service', 1), ('date', 1)], unique=True, name='daily_usage_user_service_date')
+        except Exception:
+            self.daily_usage = None
         self.auth_users.create_index('email', unique=True, name='users_email_unique')
         self.auth_sessions.create_index('token_hash', unique=True, name='auth_sessions_token_hash_unique')
         self.auth_sessions.create_index('expires_at', expireAfterSeconds=0, name='auth_sessions_expiry')
@@ -298,13 +333,31 @@ class MongoStore:
         result.pop('user_id', None)
         return result
 
-    def append_turn(self, user_id: str, conversation_id: str, question: str, answer: str, sources: list[dict[str, Any]]) -> dict[str, Any]:
+    def append_turn(self, user_id: str, conversation_id: str, question: str, answer: str, sources: list[dict[str, Any]], image: str | None = None) -> dict[str, Any]:
         existing = self.conversations.find_one({'user_id': user_id, 'conversation_id': conversation_id})
+        user_msg = {'role': 'user', 'content': question, 'created_at': 'just now'}
+        if image:
+            user_msg['image'] = image
         if not existing:
-            return self.create_conversation(user_id, conversation_id, question, answer, sources)
+            entry = {
+                'user_id': user_id,
+                'conversation_id': conversation_id,
+                'messages': [
+                    user_msg,
+                    {'role': 'assistant', 'content': answer, 'created_at': 'just now'}
+                ],
+                'title': question[:48] or 'New conversation',
+                'updated_at': 'just now',
+                'sources': sources,
+            }
+            self.conversations.insert_one(deepcopy(entry))
+            result = deepcopy(entry)
+            result.pop('_id', None)
+            result.pop('user_id', None)
+            return result
 
         new_messages = [
-            {'role': 'user', 'content': question, 'created_at': 'just now'},
+            user_msg,
             {'role': 'assistant', 'content': answer, 'created_at': 'just now'}
         ]
         title = existing.get('title') or question[:48]
@@ -321,6 +374,42 @@ class MongoStore:
         )
         updated = self.conversations.find_one({'user_id': user_id, 'conversation_id': conversation_id}, {'_id': False, 'user_id': False})
         return updated or {}
+
+    def get_daily_usage(self, user_id: str, service: str = 'gemini', limit: int = 20) -> dict[str, Any]:
+        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        try:
+            record = self.daily_usage.find_one({'user_id': user_id, 'service': service, 'date': today})
+            count = record.get('count', 0) if record else 0
+        except Exception:
+            count = 0
+        return {
+            'service': service,
+            'used': count,
+            'limit': limit,
+            'remaining': max(0, limit - count),
+            'date': today,
+        }
+
+    def increment_daily_usage(self, user_id: str, service: str = 'gemini', limit: int = 20) -> dict[str, Any]:
+        from pymongo import ReturnDocument
+        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        try:
+            record = self.daily_usage.find_one_and_update(
+                {'user_id': user_id, 'service': service, 'date': today},
+                {'$inc': {'count': 1}},
+                upsert=True,
+                return_document=ReturnDocument.AFTER,
+            )
+            count = record.get('count', 1) if record else 1
+        except Exception:
+            count = 1
+        return {
+            'service': service,
+            'used': count,
+            'limit': limit,
+            'remaining': max(0, limit - count),
+            'date': today,
+        }
 
     def delete_conversation(self, user_id: str, conversation_id: str) -> bool:
         result = self.conversations.delete_one({'user_id': user_id, 'conversation_id': conversation_id})

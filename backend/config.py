@@ -30,6 +30,9 @@ class Settings:
     DATABASE_NAME = os.getenv('DATABASE_NAME', 'personal_health_assistant').strip() or 'personal_health_assistant'
     GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
     LLM_MODEL = os.getenv('LLM_MODEL', 'openai/gpt-oss-20b').strip()
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+    GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash').strip()
+    GEMINI_DAILY_LIMIT = int(os.getenv('GEMINI_DAILY_LIMIT', '20'))
     ALLOW_EMBEDDING_DOWNLOAD = os.getenv('ALLOW_EMBEDDING_DOWNLOAD', 'true').strip().lower() in {'1', 'true', 'yes', 'on'}
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', '')
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '15'))

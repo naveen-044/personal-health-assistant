@@ -13,7 +13,7 @@ class MongoStoreTests(unittest.TestCase):
         database.name = 'personal_health_assistant'
         collections = {
             name: MagicMock()
-            for name in ('profiles', 'conversations', 'documents', 'users', 'auth_sessions', '_health_checks')
+            for name in ('profiles', 'conversations', 'documents', 'users', 'auth_sessions', '_health_checks', 'daily_usage')
         }
         database.__getitem__.side_effect = collections.__getitem__
         database.list_collection_names.return_value = ['users', 'auth_sessions']

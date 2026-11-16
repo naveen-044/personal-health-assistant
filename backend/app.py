@@ -82,6 +82,7 @@ def api_info():
             "/debug/routes",
             "/api/chat",
             "/api/chat/history",
+            "/api/chat/usage",
             "/api/documents",
             "/api/profile"
         ]

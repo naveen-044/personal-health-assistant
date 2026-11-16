@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -8,12 +8,16 @@ from pydantic import BaseModel, Field
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1)
     conversation_id: str | None = None
+    model: str | None = None
+    image: str | None = None
+    custom_api_key: str | None = None
 
 
 class ChatMessage(BaseModel):
     role: Literal['user', 'assistant']
     content: str
     created_at: str
+    image: str | None = None
 
 
 class SourceEntry(BaseModel):
@@ -28,5 +32,7 @@ class SourceEntry(BaseModel):
 class ChatResponse(BaseModel):
     conversation_id: str
     answer: str
-    sources: list[SourceEntry]
-    safety_notice: str
+    sources: list[SourceEntry] = Field(default_factory=list)
+    safety_notice: str = ''
+    model: str | None = None
+    usage: dict[str, Any] | None = None
