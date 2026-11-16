@@ -70,6 +70,13 @@ class FakeMongoStore:
     def revoke_auth_session(self, token_hash: str) -> None:
         self.sessions.pop(token_hash, None)
 
+    def update_auth_user_password(self, email: str, hashed_password: str) -> bool:
+        user = self.users_by_email.get(email)
+        if user:
+            user['hashed_password'] = hashed_password
+            return True
+        return False
+
 
 class AuthenticationRouteTests(unittest.TestCase):
     registration = {
@@ -234,6 +241,79 @@ class AuthenticationRouteTests(unittest.TestCase):
                 get_mongo_store()
 
         self.assertEqual(error.exception.status_code, 503)
+
+    def test_captcha_generation_and_password_reset_flow(self) -> None:
+        from backend.services.captcha_service import _CAPTCHA_STORE
+
+        # 1. Register a user
+        reg_resp = self.client.post('/api/auth/register', json=self.registration)
+        self.assertEqual(reg_resp.status_code, 201)
+
+        # 2. Get CAPTCHA
+        captcha_resp = self.client.get('/api/auth/captcha')
+        self.assertEqual(captcha_resp.status_code, 200)
+        data = captcha_resp.json()
+        self.assertIn('captcha_id', data)
+        self.assertIn('captcha_image', data)
+        captcha_id = data['captcha_id']
+
+        # Look up true code from internal store for test verification
+        correct_code = _CAPTCHA_STORE[captcha_id]['code']
+
+        # 3. Test wrong captcha fails
+        wrong_verify = self.client.post(
+            '/api/auth/forgot-password/verify',
+            json={
+                'email': 'alex.example@example.com',
+                'captcha_id': captcha_id,
+                'captcha_text': 'WRONG99',
+            },
+        )
+        self.assertEqual(wrong_verify.status_code, 400)
+
+        # Get fresh captcha since previous was consumed on failure
+        fresh_captcha = self.client.get('/api/auth/captcha').json()
+        correct_code = _CAPTCHA_STORE[fresh_captcha['captcha_id']]['code']
+
+        # 4. Correct captcha and email verification
+        verify_resp = self.client.post(
+            '/api/auth/forgot-password/verify',
+            json={
+                'email': 'alex.example@example.com',
+                'captcha_id': fresh_captcha['captcha_id'],
+                'captcha_text': correct_code,
+            },
+        )
+        self.assertEqual(verify_resp.status_code, 200)
+        verify_data = verify_resp.json()
+        self.assertTrue(verify_data['success'])
+        reset_token = verify_data['reset_token']
+
+        # 5. Reset password with new password
+        new_pwd = 'BrandNewPassword2026!'
+        reset_resp = self.client.post(
+            '/api/auth/reset-password',
+            json={
+                'email': 'alex.example@example.com',
+                'reset_token': reset_token,
+                'new_password': new_pwd,
+                'confirm_password': new_pwd,
+            },
+        )
+        self.assertEqual(reset_resp.status_code, 200)
+
+        # 6. Verify old password no longer works, and new password logs in successfully
+        old_login = self.client.post(
+            '/api/auth/login',
+            json={'email': 'alex.example@example.com', 'password': 'HealthSecure9!'},
+        )
+        self.assertEqual(old_login.status_code, 401)
+
+        new_login = self.client.post(
+            '/api/auth/login',
+            json={'email': 'alex.example@example.com', 'password': new_pwd},
+        )
+        self.assertEqual(new_login.status_code, 200)
 
 
 if __name__ == '__main__':

@@ -66,3 +66,44 @@ class LoginRequest(BaseModel):
         if len(value.encode('utf-8')) > 72:
             raise ValueError('Invalid email or password.')
         return value
+
+
+class VerifyCaptchaResetRequest(BaseModel):
+    email: EmailStr
+    captcha_id: str = Field(min_length=1, max_length=128)
+    captcha_text: str = Field(min_length=1, max_length=16)
+
+    @field_validator('email')
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return str(value).strip().lower()
+
+    @field_validator('captcha_text')
+    @classmethod
+    def normalize_captcha(cls, value: str) -> str:
+        return value.strip().upper()
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    reset_token: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=72)
+    confirm_password: str = Field(min_length=8, max_length=72)
+
+    @field_validator('email')
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return str(value).strip().lower()
+
+    @field_validator('new_password', 'confirm_password')
+    @classmethod
+    def validate_password_bytes(cls, value: str) -> str:
+        if len(value.encode('utf-8')) > 72:
+            raise ValueError('Password must be no more than 72 bytes.')
+        return value
+
+    @model_validator(mode='after')
+    def validate_matching_passwords(self) -> 'ResetPasswordRequest':
+        if self.new_password != self.confirm_password:
+            raise ValueError('Passwords do not match.')
+        return self

@@ -15,10 +15,24 @@ from backend.auth.security import (
     public_user,
     validate_auth_configuration,
     verify_password,
+    _jwt_secret,
 )
 from backend.config import settings
 from backend.database.store import MongoStore
-from backend.schemas.auth import LoginRequest, RegisterRequest
+from backend.schemas.auth import (
+    LoginRequest,
+    RegisterRequest,
+    VerifyCaptchaResetRequest,
+    ResetPasswordRequest,
+)
+from backend.services.captcha_service import (
+    generate_captcha,
+    verify_captcha,
+    mark_reset_token_consumed,
+    is_reset_token_consumed,
+)
+import jwt
+import secrets
 
 router = APIRouter(prefix='/api/auth', tags=['Authentication'])
 
@@ -191,3 +205,97 @@ def logout(
     _clear_refresh_cookie(response)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
+
+
+@router.get('/captcha')
+def get_captcha() -> dict:
+    """Generate a visual challenge CAPTCHA with noise distortion for bot prevention."""
+    return generate_captcha()
+
+
+@router.post('/forgot-password/verify')
+def verify_forgot_password_captcha(
+    payload: VerifyCaptchaResetRequest,
+    request: Request,
+    database: MongoStore = Depends(get_mongo_store),
+) -> dict:
+    """Verify email and captcha challenge before allowing password reset."""
+    _validate_request_origin(request)
+
+    if not verify_captcha(payload.captcha_id, payload.captcha_text):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Incorrect CAPTCHA code. Please check the characters and try again.',
+        )
+
+    user = database.find_auth_user_by_email(str(payload.email))
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='No account registered with this email address.',
+        )
+
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=15)
+    reset_token = jwt.encode(
+        {
+            'sub': str(payload.email),
+            'type': 'password_reset',
+            'jti': secrets.token_urlsafe(16),
+            'iat': now,
+            'exp': expires_at,
+        },
+        _jwt_secret(),
+        algorithm='HS256',
+    )
+
+    return {
+        'success': True,
+        'reset_token': reset_token,
+        'message': 'Verification successful. Please enter your new password.',
+    }
+
+
+@router.post('/reset-password')
+def reset_password(
+    payload: ResetPasswordRequest,
+    request: Request,
+    database: MongoStore = Depends(get_mongo_store),
+) -> dict:
+    """Reset account password using verified reset token."""
+    _validate_request_origin(request)
+
+    if is_reset_token_consumed(payload.reset_token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='This password reset request has already been used. Please request a new one.',
+        )
+
+    try:
+        token_data = jwt.decode(payload.reset_token, _jwt_secret(), algorithms=['HS256'])
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Password reset session has expired or is invalid. Please try again.',
+        ) from exc
+
+    if token_data.get('type') != 'password_reset' or token_data.get('sub') != str(payload.email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Password reset token does not match this email address.',
+        )
+
+    mark_reset_token_consumed(payload.reset_token)
+
+    hashed = hash_password(payload.new_password)
+    updated = database.update_auth_user_password(str(payload.email), hashed)
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='User account not found.',
+        )
+
+    return {
+        'success': True,
+        'message': 'Password has been reset successfully! You can now sign in with your new password.',
+    }

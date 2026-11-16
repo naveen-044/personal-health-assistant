@@ -325,6 +325,22 @@ class MongoStore:
             return None
         return self.auth_users.find_one({'_id': object_id})
 
+    def update_auth_user_password(self, email: str, hashed_password: str) -> bool:
+        normalized_email = email.strip().lower()
+        result = self.auth_users.update_one(
+            {'email': normalized_email},
+            {
+                '$set': {
+                    'hashed_password': hashed_password,
+                    'updated_at': datetime.now(timezone.utc),
+                }
+            },
+        )
+        user = self.find_auth_user_by_email(normalized_email)
+        if user and '_id' in user:
+            self.auth_sessions.delete_many({'user_id': str(user['_id'])})
+        return result.modified_count > 0 or result.matched_count > 0
+
     def create_auth_session(
         self,
         user_id: str,
